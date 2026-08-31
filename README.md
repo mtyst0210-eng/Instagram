@@ -15,6 +15,7 @@
 | ファイル | 内容 |
 | --- | --- |
 | [分析：ゴマたま鶏しゃぶ（8/27投稿）](docs/analysis/2026-08-27_goma-tama-torishabu.md) | インサイトとコマ解析による診断 |
+| [参考リールの分解](docs/analysis/2026-08-27_reference-teardown.md) | @maho_protein のリールから、伸びている要素と真似していい範囲を整理 |
 | [台本：凍ったまま削るねぎ塩鶏](docs/scripts/2026-09_negishio-tori.md) | 上記の分析をもとにした次回リールの台本 |
 
 ## 使い方
