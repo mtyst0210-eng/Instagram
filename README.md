@@ -10,6 +10,13 @@
 | [リール企画シート](docs/templates/reel-planning-sheet.md) | 企画・構成・投稿文・実績を記入するテンプレート |
 | [投稿前チェックリスト](docs/templates/pre-post-checklist.md) | 承認者が投稿前に確認する項目 |
 
+## 投稿の分析と台本
+
+| ファイル | 内容 |
+| --- | --- |
+| [分析：ゴマたま鶏しゃぶ（8/27投稿）](docs/analysis/2026-08-27_goma-tama-torishabu.md) | インサイトとコマ解析による診断 |
+| [台本：凍ったまま削るねぎ塩鶏](docs/scripts/2026-09_negishio-tori.md) | 上記の分析をもとにした次回リールの台本 |
+
 ## 使い方
 
 1. 新しいリールを作るときは、[リール作成 手順書](docs/reels-creation-procedure.md) のフローに沿って進める。
