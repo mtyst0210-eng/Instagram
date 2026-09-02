@@ -2,6 +2,17 @@
 
 自社 Instagram アカウントの運用に関する手順書・テンプレートを管理するリポジトリです。
 
+## 運用アカウント
+
+作業手順・テンプレート（下記「ドキュメント」）は全アカウント共通。アカウントごとの前提・台本・分析は以下に分かれています。
+
+| アカウント | 前提（CLAUDE.md） | 台本・分析 |
+| --- | --- | --- |
+| レシピ（冷凍ストック・時短） | [ルート CLAUDE.md](CLAUDE.md) | [docs/scripts](docs/scripts) / [docs/analysis](docs/analysis) |
+| amber（タイ古式マッサージサロン） | [accounts/amber/CLAUDE.md](accounts/amber/CLAUDE.md) | [accounts/amber/docs/scripts](accounts/amber/docs/scripts) / [accounts/amber/docs/analysis](accounts/amber/docs/analysis) |
+
+新しいアカウントを追加する場合は `accounts/<アカウント名>/` に同じ構成（`CLAUDE.md` + `docs/scripts` + `docs/analysis`）を作成してください。
+
 ## ドキュメント
 
 | ドキュメント | 内容 |
