@@ -22,6 +22,7 @@
     --ink-contrast: #faf8f6;
     --good: #7c8a70;
     --good-soft: #eaece2;
+    --cat-other: #ab8a4c;
     --danger: #a5644f;
     --danger-soft: #f1e2da;
     --ring-track: #ece4e0;
@@ -43,6 +44,7 @@
       --ink-contrast: #18161a;
       --good: #a0ac93;
       --good-soft: #2b2f26;
+      --cat-other: #cdab6c;
       --danger: #cb8872;
       --danger-soft: #33241f;
       --ring-track: #332f33;
@@ -64,6 +66,7 @@
     --ink-contrast: #18161a;
     --good: #a0ac93;
     --good-soft: #2b2f26;
+    --cat-other: #cdab6c;
     --danger: #cb8872;
     --danger-soft: #33241f;
     --ring-track: #332f33;
@@ -272,6 +275,38 @@
   }
   button.primary:hover { opacity: 0.82; }
 
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+
+  .text-link {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-decoration: underline;
+    text-decoration-color: var(--border);
+    text-underline-offset: 3px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .text-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
   /* ---------- main ---------- */
   .main { display: flex; flex-direction: column; gap: 22px; }
 
@@ -331,8 +366,29 @@
   .task-row .chk svg { width: 11px; height: 11px; display: none; }
   .task-row .chk.done svg { display: block; }
 
-  .task-row .title { flex: 1; font-size: 14.5px; letter-spacing: 0.01em; }
+  .task-row .title {
+    flex: 1;
+    font-size: 14.5px;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    min-width: 0;
+  }
   .task-row.done .title { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--border); }
+  .task-row .title .label { overflow-wrap: anywhere; }
+
+  .cat-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex: none;
+    position: relative;
+    top: -1px;
+  }
+  .cat-dot.cat-agency { background: var(--accent); }
+  .cat-dot.cat-own { background: var(--good); }
+  .cat-dot.cat-other { background: var(--cat-other); }
 
   .task-row .badge {
     font-family: "Shippori Mincho", serif;
@@ -488,7 +544,7 @@
 
       <div style="margin-top:16px;">
         <div class="goal-label">今月の目標</div>
-        <input class="goal-input" id="goalInput" type="text" placeholder="例：リールを月4本、企画〜投稿まで完了させる" />
+        <input class="goal-input" id="goalInput" type="text" placeholder="例：クライアント対応と自分の投稿、両方を滞りなく進める" />
       </div>
     </div>
 
@@ -497,7 +553,15 @@
       <form class="add-task" id="addForm">
         <div class="field">
           <label for="taskTitle">やること</label>
-          <input type="text" id="taskTitle" placeholder="例：台本を仕上げる" required />
+          <input type="text" id="taskTitle" placeholder="例：「工務店」投稿作成" required />
+        </div>
+        <div class="field">
+          <label for="taskCategory">分類</label>
+          <select id="taskCategory">
+            <option value="agency">運用代行</option>
+            <option value="own">自身アカウント</option>
+            <option value="other">その他</option>
+          </select>
         </div>
         <div class="field-row">
           <div class="field">
@@ -515,7 +579,15 @@
         </div>
         <button type="submit" class="primary">追加する</button>
       </form>
+
+      <div class="legend">
+        <span><i class="cat-dot cat-agency"></i>運用代行</span>
+        <span><i class="cat-dot cat-own"></i>自身アカウント</span>
+        <span><i class="cat-dot cat-other"></i>その他</span>
+      </div>
     </div>
+
+    <button type="button" class="text-link" id="resetTemplateBtn">この月をテンプレートで入れ直す</button>
   </aside>
 
   <main class="main">
@@ -570,39 +642,45 @@
 
   function uid() { return Math.random().toString(36).slice(2, 10); }
 
+  // 大枠の項目（運用代行 / 自身アカウント / その他）に沿った月間テンプレート。
+  // day は「その月の何日」を指す（末日を超える分は末日にまとめる）。
+  const TEMPLATE = [
+    { day: 2,  title: "「工務店」投稿作成", category: "agency" },
+    { day: 3,  title: "「タイ古式マッサージ店」ストーリー更新", category: "agency" },
+    { day: 4,  title: "リール撮影", category: "own" },
+    { day: 5,  title: "リール編集", category: "own" },
+    { day: 6,  title: "「タイ古式マッサージ店」投稿作成", category: "agency" },
+    { day: 8,  title: "「工務店」投稿作成", category: "agency" },
+    { day: 9,  title: "自身アカウント ストーリー更新", category: "own" },
+    { day: 11, title: "リール作成（投稿）", category: "own" },
+    { day: 13, title: "「タイ古式マッサージ店」ストーリー更新", category: "agency" },
+    { day: 15, title: "「工務店」投稿作成", category: "agency" },
+    { day: 17, title: "「タイ古式マッサージ店」投稿作成", category: "agency" },
+    { day: 20, title: "自身アカウント ストーリー更新", category: "own" },
+    { day: 22, title: "「工務店」投稿作成", category: "agency" },
+    { day: 25, title: "リール撮影", category: "own" },
+    { day: 27, title: "リール編集", category: "own" },
+    { day: 28, title: "請求書作成", category: "other" },
+    { day: 30, title: "振り返りシート・成果報告書を提出", category: "other" },
+  ];
+
+  function buildTemplateTasks(year, month) {
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const clamp = n => Math.min(Math.max(n, 1), lastDay);
+    return TEMPLATE.map(t => {
+      const date = toISO(new Date(year, month, clamp(t.day)));
+      return { id: uid(), date, title: t.title, category: t.category, done: date < toISO(today) };
+    });
+  }
+
   function seedIfNeeded() {
     try { if (localStorage.getItem(SEED_FLAG)) return; } catch (e) { return; }
     const key = monthKey(today);
     const existing = loadTasks(key);
     if (existing.length) { localStorage.setItem(SEED_FLAG, "1"); return; }
 
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    const clamp = n => Math.min(Math.max(n, 1), lastDay);
-    const dateOf = day => toISO(new Date(today.getFullYear(), today.getMonth(), clamp(day)));
-
-    const plan = [
-      { d: today.getDate() - 6, title: "次のリールの企画を決める", done: true },
-      { d: today.getDate() - 3, title: "台本を書く（構成・テロップ案）", done: true },
-      { d: today.getDate() - 1, title: "素材を撮影する", done: false },
-      { d: today.getDate(),     title: "コンタクトシートで撮れ高を確認する", done: false },
-      { d: today.getDate() + 2, title: "カット割り・テロップ合成", done: false },
-      { d: today.getDate() + 4, title: "ラフカットを見直す", done: false },
-      { d: today.getDate() + 5, title: "投稿前チェックリストで確認", done: false },
-      { d: today.getDate() + 6, title: "投稿する（アプリ内でBGMを付ける）", done: false },
-      { d: today.getDate() + 8, title: "インサイトを確認する", done: false },
-      { d: today.getDate() + 12,title: "投稿を分析してdocsにまとめる", done: false },
-      { d: today.getDate() + 18,title: "来月分の企画候補を3つ出す", done: false },
-    ];
-
-    const tasks = plan.map(p => ({
-      id: uid(),
-      date: dateOf(p.d),
-      title: p.title,
-      done: !!p.done
-    }));
-
-    saveTasks(key, tasks);
-    saveGoal(key, "リールを2本、企画〜投稿〜振り返りまで完了させる");
+    saveTasks(key, buildTemplateTasks(today.getFullYear(), today.getMonth()));
+    saveGoal(key, "クライアント対応と自分の投稿、両方を滞りなく進める");
     localStorage.setItem(SEED_FLAG, "1");
     showSeedBanner();
   }
@@ -661,6 +739,8 @@
     return '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
+  const CATEGORY_LABELS = { agency: "運用代行", own: "自身アカウント", other: "その他" };
+
   function renderTaskRow(task, opts) {
     opts = opts || {};
     const row = document.createElement("div");
@@ -674,7 +754,16 @@
 
     const title = document.createElement("div");
     title.className = "title";
-    title.textContent = task.title;
+    if (task.category && CATEGORY_LABELS[task.category]) {
+      const dot = document.createElement("i");
+      dot.className = "cat-dot cat-" + task.category;
+      dot.title = CATEGORY_LABELS[task.category];
+      title.appendChild(dot);
+    }
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = task.title;
+    title.appendChild(label);
 
     row.appendChild(chk);
     row.appendChild(title);
@@ -862,10 +951,12 @@
   document.getElementById("addForm").addEventListener("submit", e => {
     e.preventDefault();
     const titleEl = document.getElementById("taskTitle");
+    const categoryEl = document.getElementById("taskCategory");
     const dateEl = document.getElementById("taskDate");
     const repeatEl = document.getElementById("taskRepeat");
 
     const title = titleEl.value.trim();
+    const category = categoryEl.value;
     const dateVal = dateEl.value;
     if (!title || !dateVal) return;
 
@@ -873,7 +964,7 @@
     const targetKey = dateVal.slice(0, 7);
     const targetTasks = targetKey === currentKey ? currentTasks : loadTasks(targetKey);
 
-    dates.forEach(d => targetTasks.push({ id: uid(), date: d, title, done: false }));
+    dates.forEach(d => targetTasks.push({ id: uid(), date: d, title, category, done: false }));
     saveTasks(targetKey, targetTasks);
 
     // jump to the month the new task(s) belong to
@@ -882,7 +973,17 @@
 
     titleEl.value = "";
     dateEl.value = "";
+    categoryEl.value = "agency";
     repeatEl.value = "once";
+    render();
+  });
+
+  document.getElementById("resetTemplateBtn").addEventListener("click", () => {
+    const label = `${viewDate.getFullYear()}年${viewDate.getMonth() + 1}月`;
+    const ok = window.confirm(`${label}のタスクをテンプレートで入れ直します。この月に追加・編集した内容は失われます。よろしいですか？`);
+    if (!ok) return;
+    const key = monthKey(viewDate);
+    saveTasks(key, buildTemplateTasks(viewDate.getFullYear(), viewDate.getMonth()));
     render();
   });
 
