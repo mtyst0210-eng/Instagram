@@ -93,11 +93,16 @@
 
   /* ---------- sidebar ---------- */
   .sidebar {
-    position: sticky;
-    top: 24px;
     display: flex;
     flex-direction: column;
     gap: 18px;
+  }
+
+  @media (min-width: 861px) {
+    .sidebar {
+      position: sticky;
+      top: 24px;
+    }
   }
 
   .card {
