@@ -415,6 +415,52 @@
     color: var(--text-muted);
   }
 
+  .anytime-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+  .anytime-count {
+    font-family: "Shippori Mincho", serif;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .anytime-list { margin-bottom: 14px; }
+  .anytime-add {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .anytime-add input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 4px 1px 7px;
+  }
+  .anytime-add input:focus { outline: none; border-bottom-color: var(--accent); }
+  .anytime-add button {
+    flex: none;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    padding: 7px 14px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .anytime-add button:hover { border-color: var(--accent); color: var(--accent); }
+
   .text-link {
     align-self: flex-start;
     background: none;
@@ -513,14 +559,6 @@
   .cat-dot.cat-agency { background: var(--accent); }
   .cat-dot.cat-own { background: var(--good); }
   .cat-dot.cat-other { background: var(--cat-other); }
-
-  .task-row .badge {
-    font-family: "Shippori Mincho", serif;
-    font-style: italic;
-    font-size: 12px;
-    color: var(--danger);
-    flex: none;
-  }
 
   .task-row .del {
     flex: none;
@@ -779,6 +817,18 @@
       </div>
     </div>
 
+    <div class="card">
+      <div class="anytime-head">
+        <div class="goal-label" style="margin-bottom:0;">時間が空いたら進める</div>
+        <div class="anytime-count" id="anytimeCount">0 / 0</div>
+      </div>
+      <div class="task-list anytime-list" id="anytimeList"></div>
+      <form class="anytime-add" id="anytimeForm">
+        <input type="text" id="anytimeTitle" placeholder="例：来月の企画を考える" required />
+        <button type="submit">追加</button>
+      </form>
+    </div>
+
     <button type="button" class="text-link" id="resetTemplateBtn">この月をテンプレートで入れ直す</button>
   </aside>
 
@@ -985,6 +1035,147 @@
   renderDatePicker();
   updateDatePickerSummary();
 
+  // ---------- anytime list (no date, sits beside the calendar) ----------
+
+  const ANYTIME_KEY = "mtm:anytime";
+  const anytimeListEl = document.getElementById("anytimeList");
+  const anytimeCountEl = document.getElementById("anytimeCount");
+
+  function loadAnytime() {
+    try { return JSON.parse(localStorage.getItem(ANYTIME_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveAnytime(list) {
+    try { localStorage.setItem(ANYTIME_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  let anytimeTasks = loadAnytime();
+  let editingAnytimeId = null;
+
+  function renderAnytimeRow(task) {
+    if (task.id === editingAnytimeId) return renderAnytimeEditRow(task);
+
+    const row = document.createElement("div");
+    row.className = "task-row" + (task.done ? " done" : "");
+
+    const chk = document.createElement("button");
+    chk.className = "chk" + (task.done ? " done" : "");
+    chk.innerHTML = checkIcon();
+    chk.setAttribute("aria-label", task.done ? "完了を取り消す" : "完了にする");
+    chk.addEventListener("click", () => toggleAnytime(task.id));
+
+    const title = document.createElement("div");
+    title.className = "title";
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = task.title;
+    title.appendChild(label);
+
+    const edit = document.createElement("button");
+    edit.className = "del edit-btn";
+    edit.innerHTML = editIcon();
+    edit.setAttribute("aria-label", "編集");
+    edit.addEventListener("click", () => { editingAnytimeId = task.id; renderAnytime(); });
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "×";
+    del.setAttribute("aria-label", "削除");
+    del.addEventListener("click", () => deleteAnytime(task.id));
+
+    row.appendChild(chk);
+    row.appendChild(title);
+    row.appendChild(edit);
+    row.appendChild(del);
+    return row;
+  }
+
+  function renderAnytimeEditRow(task) {
+    const row = document.createElement("div");
+    row.className = "task-row task-edit";
+
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "edit-title";
+    titleInput.value = task.title;
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "edit-save";
+    saveBtn.innerHTML = checkIcon();
+    saveBtn.setAttribute("aria-label", "保存");
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "edit-cancel";
+    cancelBtn.textContent = "×";
+    cancelBtn.setAttribute("aria-label", "編集をやめる");
+
+    const doSave = () => {
+      const v = titleInput.value.trim();
+      if (!v) return;
+      const t = anytimeTasks.find(x => x.id === task.id);
+      if (t) t.title = v;
+      saveAnytime(anytimeTasks);
+      editingAnytimeId = null;
+      renderAnytime();
+    };
+    saveBtn.addEventListener("click", doSave);
+    cancelBtn.addEventListener("click", () => { editingAnytimeId = null; renderAnytime(); });
+    titleInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); doSave(); }
+      if (e.key === "Escape") { editingAnytimeId = null; renderAnytime(); }
+    });
+
+    const line = document.createElement("div");
+    line.className = "edit-row";
+    line.appendChild(titleInput);
+    line.appendChild(saveBtn);
+    line.appendChild(cancelBtn);
+    row.appendChild(line);
+    return row;
+  }
+
+  function toggleAnytime(id) {
+    const t = anytimeTasks.find(x => x.id === id);
+    if (!t) return;
+    t.done = !t.done;
+    saveAnytime(anytimeTasks);
+    renderAnytime();
+  }
+  function deleteAnytime(id) {
+    anytimeTasks = anytimeTasks.filter(x => x.id !== id);
+    saveAnytime(anytimeTasks);
+    renderAnytime();
+  }
+
+  function renderAnytime() {
+    anytimeListEl.innerHTML = "";
+    if (!anytimeTasks.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "空いた時間にやることを追加しましょう";
+      anytimeListEl.appendChild(empty);
+    } else {
+      anytimeTasks.forEach(t => anytimeListEl.appendChild(renderAnytimeRow(t)));
+    }
+    const done = anytimeTasks.filter(t => t.done).length;
+    anytimeCountEl.textContent = `${done} / ${anytimeTasks.length}`;
+  }
+
+  document.getElementById("anytimeForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const input = document.getElementById("anytimeTitle");
+    const v = input.value.trim();
+    if (!v) return;
+    anytimeTasks.push({ id: uid(), title: v, done: false });
+    saveAnytime(anytimeTasks);
+    input.value = "";
+    renderAnytime();
+  });
+
+  renderAnytime();
+
   // ---------- rendering ----------
 
   const monthTitleEl = document.getElementById("monthTitle");
@@ -1024,8 +1215,7 @@
   const CATEGORY_LABELS = { agency: "運用代行", own: "自身アカウント", other: "その他" };
   let editingId = null;
 
-  function renderTaskRow(task, opts) {
-    opts = opts || {};
+  function renderTaskRow(task) {
     if (task.id === editingId) return renderEditRow(task);
 
     const row = document.createElement("div");
@@ -1052,13 +1242,6 @@
 
     row.appendChild(chk);
     row.appendChild(title);
-
-    if (opts.badge) {
-      const badge = document.createElement("span");
-      badge.className = "badge" + (opts.overdue ? " overdue" : "");
-      badge.textContent = opts.badge;
-      row.appendChild(badge);
-    }
 
     const edit = document.createElement("button");
     edit.className = "del edit-btn";
@@ -1225,11 +1408,9 @@
     const key = monthKey(today);
     const tasks = key === currentKey ? currentTasks : loadTasks(key);
     const todayISO = toISO(today);
-
     const dueToday = tasks.filter(t => t.date === todayISO);
-    const overdue = tasks.filter(t => !t.done && t.date < todayISO);
 
-    if (!dueToday.length && !overdue.length) {
+    if (!dueToday.length) {
       const empty = document.createElement("div");
       empty.className = "empty-note";
       empty.textContent = "今日の予定はありません。左のフォームからタスクを追加できます。";
@@ -1237,11 +1418,6 @@
       return;
     }
 
-    overdue.sort((a, b) => a.date.localeCompare(b.date));
-    overdue.forEach(t => {
-      const daysLate = Math.round((today - new Date(t.date + "T00:00:00")) / 86400000);
-      todayListEl.appendChild(renderTaskRow(t, { badge: `${daysLate}日超過`, overdue: true }));
-    });
     dueToday.forEach(t => todayListEl.appendChild(renderTaskRow(t)));
   }
 
