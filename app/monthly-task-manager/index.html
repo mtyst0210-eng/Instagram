@@ -532,11 +532,69 @@
     border-radius: 50%;
     font-size: 15px;
     line-height: 1;
-    opacity: 0;
-    transition: opacity .15s;
+    opacity: 0.45;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .15s, color .15s;
   }
+  .task-row .del svg { width: 12px; height: 12px; }
   .task-row:hover .del { opacity: 1; }
   .task-row .del:hover { color: var(--danger); }
+  .task-row .edit-btn:hover { color: var(--accent); }
+
+  .task-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 2px;
+    align-items: stretch;
+  }
+  .task-edit .edit-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .task-edit input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 3px 1px 7px;
+  }
+  .task-edit select,
+  .task-edit input[type="date"] {
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 3px 1px 7px;
+    min-width: 0;
+  }
+  .task-edit select { flex: 1; }
+  .task-edit input[type="date"] { flex: 1; }
+  .task-edit input:focus, .task-edit select:focus {
+    outline: none;
+    border-bottom-color: var(--accent);
+  }
+  .task-edit .edit-save, .task-edit .edit-cancel {
+    flex: none;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .task-edit .edit-save { color: var(--accent); border-color: var(--accent); }
+  .task-edit .edit-save svg { width: 12px; height: 12px; }
+  .task-edit .edit-save:hover { background: var(--accent); color: var(--accent-contrast); }
+  .task-edit .edit-cancel { color: var(--text-muted); font-size: 14px; }
+  .task-edit .edit-cancel:hover { color: var(--danger); border-color: var(--danger); }
 
   .empty-note {
     color: var(--text-muted);
@@ -959,11 +1017,17 @@
   function checkIcon() {
     return '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
+  function editIcon() {
+    return '<svg viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.4 1.4 0 0 1 2 2L5.5 12.1l-2.8.7.7-2.8L11.3 2.3Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
 
   const CATEGORY_LABELS = { agency: "運用代行", own: "自身アカウント", other: "その他" };
+  let editingId = null;
 
   function renderTaskRow(task, opts) {
     opts = opts || {};
+    if (task.id === editingId) return renderEditRow(task);
+
     const row = document.createElement("div");
     row.className = "task-row" + (task.done ? " done" : "");
 
@@ -996,6 +1060,13 @@
       row.appendChild(badge);
     }
 
+    const edit = document.createElement("button");
+    edit.className = "del edit-btn";
+    edit.innerHTML = editIcon();
+    edit.setAttribute("aria-label", "編集");
+    edit.addEventListener("click", () => { editingId = task.id; render(); });
+    row.appendChild(edit);
+
     const del = document.createElement("button");
     del.className = "del";
     del.textContent = "×";
@@ -1004,6 +1075,98 @@
     row.appendChild(del);
 
     return row;
+  }
+
+  function renderEditRow(task) {
+    const row = document.createElement("div");
+    row.className = "task-row task-edit";
+
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "edit-title";
+    titleInput.value = task.title;
+    titleInput.required = true;
+
+    const categorySelect = document.createElement("select");
+    categorySelect.className = "edit-category";
+    Object.keys(CATEGORY_LABELS).forEach(key => {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = CATEGORY_LABELS[key];
+      if (task.category === key) opt.selected = true;
+      categorySelect.appendChild(opt);
+    });
+
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.className = "edit-date";
+    dateInput.value = task.date;
+    dateInput.required = true;
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "edit-save";
+    saveBtn.innerHTML = checkIcon();
+    saveBtn.setAttribute("aria-label", "保存");
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "edit-cancel";
+    cancelBtn.textContent = "×";
+    cancelBtn.setAttribute("aria-label", "編集をやめる");
+
+    const doSave = () => {
+      const title = titleInput.value.trim();
+      const date = dateInput.value;
+      if (!title || !date) return;
+      saveTaskEdit(task, title, categorySelect.value, date);
+    };
+    saveBtn.addEventListener("click", doSave);
+    cancelBtn.addEventListener("click", () => { editingId = null; render(); });
+    titleInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); doSave(); }
+      if (e.key === "Escape") { editingId = null; render(); }
+    });
+
+    const line1 = document.createElement("div");
+    line1.className = "edit-row";
+    line1.appendChild(titleInput);
+
+    const line2 = document.createElement("div");
+    line2.className = "edit-row";
+    line2.appendChild(categorySelect);
+    line2.appendChild(dateInput);
+    line2.appendChild(saveBtn);
+    line2.appendChild(cancelBtn);
+
+    row.appendChild(line1);
+    row.appendChild(line2);
+    return row;
+  }
+
+  function saveTaskEdit(task, newTitle, newCategory, newDate) {
+    const oldKey = task.date.slice(0, 7);
+    const oldMonthTasks = loadTasks(oldKey);
+    const idx = oldMonthTasks.findIndex(t => t.id === task.id);
+    if (idx === -1) { editingId = null; render(); return; }
+
+    const updated = Object.assign({}, oldMonthTasks[idx], {
+      title: newTitle, category: newCategory, date: newDate
+    });
+    oldMonthTasks.splice(idx, 1);
+    saveTasks(oldKey, oldMonthTasks);
+
+    const newKey = newDate.slice(0, 7);
+    const newMonthTasks = newKey === oldKey ? oldMonthTasks : loadTasks(newKey);
+    newMonthTasks.push(updated);
+    saveTasks(newKey, newMonthTasks);
+
+    if (newKey !== monthKey(viewDate)) {
+      const [yy, mm] = newKey.split("-").map(Number);
+      viewDate = new Date(yy, mm - 1, 1);
+    }
+    editingId = null;
+    render();
   }
 
   let currentKey = "";
