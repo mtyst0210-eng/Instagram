@@ -869,10 +869,6 @@
 (function () {
   "use strict";
 
-  const STORAGE_PREFIX = "mtm:tasks:";
-  const GOAL_PREFIX = "mtm:goal:";
-  const SEED_FLAG = "mtm:seeded";
-
   const pad2 = n => String(n).padStart(2, "0");
   const toISO = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   const monthKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
@@ -883,21 +879,122 @@
   let today = startOfDay(new Date());
   let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  function loadTasks(key) {
-    try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + key)) || []; }
-    catch (e) { return []; }
-  }
-  function saveTasks(key, tasks) {
-    try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(tasks)); } catch (e) {}
-  }
-  function loadGoal(key) {
-    try { return localStorage.getItem(GOAL_PREFIX + key) || ""; } catch (e) { return ""; }
-  }
-  function saveGoal(key, val) {
-    try { localStorage.setItem(GOAL_PREFIX + key, val); } catch (e) {}
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  // ---------- storage: synced via the db capability when available (so a
+  // phone and a PC opening the same artifact link share one task list),
+  // falling back to this browser's localStorage when it isn't ----------
+
+  let db = null;
+  let allTasks = [];      // { id, date, title, category, done, createdAt }
+  let goals = {};         // { [monthKey]: text }
+  let anytimeTasks = [];  // { id, title, done, createdAt }
+  let seeded = false;
+
+  const LS_TASKS = "mtm:v2:tasks";
+  const LS_GOALS = "mtm:v2:goals";
+  const LS_ANYTIME = "mtm:v2:anytime";
+  const LS_SEEDED = "mtm:v2:seeded";
+
+  function lsSaveTasks() { try { localStorage.setItem(LS_TASKS, JSON.stringify(allTasks)); } catch (e) {} }
+  function lsSaveGoals() { try { localStorage.setItem(LS_GOALS, JSON.stringify(goals)); } catch (e) {} }
+  function lsSaveAnytime() { try { localStorage.setItem(LS_ANYTIME, JSON.stringify(anytimeTasks)); } catch (e) {} }
+  function lsSaveSeeded() { try { localStorage.setItem(LS_SEEDED, "1"); } catch (e) {} }
+
+  // one-time pickup of the original (per-month key) storage format
+  function migrateOldLocalStorage() {
+    if (allTasks.length || Object.keys(goals).length || anytimeTasks.length) return;
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.indexOf("mtm:tasks:") === 0) {
+          const monthTasks = JSON.parse(localStorage.getItem(key)) || [];
+          allTasks = allTasks.concat(monthTasks);
+        } else if (key.indexOf("mtm:goal:") === 0) {
+          goals[key.slice("mtm:goal:".length)] = localStorage.getItem(key);
+        } else if (key === "mtm:anytime") {
+          anytimeTasks = JSON.parse(localStorage.getItem(key)) || [];
+        }
+      });
+      if (allTasks.length) lsSaveTasks();
+      if (Object.keys(goals).length) lsSaveGoals();
+      if (anytimeTasks.length) lsSaveAnytime();
+    } catch (e) {}
   }
 
-  function uid() { return Math.random().toString(36).slice(2, 10); }
+  function lsLoadAll() {
+    try { allTasks = JSON.parse(localStorage.getItem(LS_TASKS)) || []; } catch (e) { allTasks = []; }
+    try { goals = JSON.parse(localStorage.getItem(LS_GOALS)) || {}; } catch (e) { goals = {}; }
+    try { anytimeTasks = JSON.parse(localStorage.getItem(LS_ANYTIME)) || []; } catch (e) { anytimeTasks = []; }
+    try { seeded = !!localStorage.getItem(LS_SEEDED); } catch (e) { seeded = false; }
+    migrateOldLocalStorage();
+  }
+
+  function handleDbError(e) {
+    console.error("db sync error:", e && e.code, e && e.message);
+  }
+
+  function upsertTask(task, opts) {
+    const idx = allTasks.findIndex(t => t.id === task.id);
+    if (idx === -1) allTasks.push(task); else allTasks[idx] = task;
+    if (db) {
+      const body = Object.assign({}, task);
+      delete body.id;
+      db.collection("tasks").doc(task.id).set(body).catch(handleDbError);
+    } else {
+      lsSaveTasks();
+    }
+    if (!opts || !opts.skipRender) render();
+  }
+
+  function removeTaskEverywhere(id, opts) {
+    allTasks = allTasks.filter(t => t.id !== id);
+    if (db) {
+      db.collection("tasks").doc(id).delete().catch(handleDbError);
+    } else {
+      lsSaveTasks();
+    }
+    if (!opts || !opts.skipRender) render();
+  }
+
+  function replaceMonthTasks(year, month, newTasks) {
+    const key = `${year}-${pad2(month + 1)}`;
+    allTasks.filter(t => t.date.slice(0, 7) === key)
+      .forEach(t => removeTaskEverywhere(t.id, { skipRender: true }));
+    newTasks.forEach(t => upsertTask(t, { skipRender: true }));
+    render();
+  }
+
+  function setGoal(key, text) {
+    goals[key] = text;
+    if (db) {
+      db.collection("goals").doc(key).set({ text }).catch(handleDbError);
+    } else {
+      lsSaveGoals();
+    }
+  }
+
+  function upsertAnytime(task, opts) {
+    const idx = anytimeTasks.findIndex(t => t.id === task.id);
+    if (idx === -1) anytimeTasks.push(task); else anytimeTasks[idx] = task;
+    if (db) {
+      const body = Object.assign({}, task);
+      delete body.id;
+      db.collection("anytime").doc(task.id).set(body).catch(handleDbError);
+    } else {
+      lsSaveAnytime();
+    }
+    if (!opts || !opts.skipRender) renderAnytime();
+  }
+
+  function removeAnytime(id, opts) {
+    anytimeTasks = anytimeTasks.filter(t => t.id !== id);
+    if (db) {
+      db.collection("anytime").doc(id).delete().catch(handleDbError);
+    } else {
+      lsSaveAnytime();
+    }
+    if (!opts || !opts.skipRender) renderAnytime();
+  }
 
   // 大枠の項目（運用代行 / 自身アカウント / その他）に沿った月間テンプレート。
   // day は「その月の何日」を指す（末日を超える分は末日にまとめる）。
@@ -924,22 +1021,77 @@
   function buildTemplateTasks(year, month) {
     const lastDay = new Date(year, month + 1, 0).getDate();
     const clamp = n => Math.min(Math.max(n, 1), lastDay);
-    return TEMPLATE.map(t => {
+    return TEMPLATE.map((t, i) => {
       const date = toISO(new Date(year, month, clamp(t.day)));
-      return { id: uid(), date, title: t.title, category: t.category, done: date < toISO(today) };
+      return { id: uid(), date, title: t.title, category: t.category, done: date < toISO(today), createdAt: Date.now() + i };
     });
   }
 
-  function seedIfNeeded() {
-    try { if (localStorage.getItem(SEED_FLAG)) return; } catch (e) { return; }
-    const key = monthKey(today);
-    const existing = loadTasks(key);
-    if (existing.length) { localStorage.setItem(SEED_FLAG, "1"); return; }
+  function markSeeded() {
+    seeded = true;
+    if (db) db.doc("meta/state").set({ seeded: true }).catch(handleDbError);
+    else lsSaveSeeded();
+  }
 
-    saveTasks(key, buildTemplateTasks(today.getFullYear(), today.getMonth()));
-    saveGoal(key, "クライアント対応と自分の投稿、両方を滞りなく進める");
-    localStorage.setItem(SEED_FLAG, "1");
+  function maybeSeed() {
+    if (seeded) return;
+    const key = monthKey(today);
+    const hasCurrentMonth = allTasks.some(t => t.date.slice(0, 7) === key);
+    if (hasCurrentMonth) { markSeeded(); return; }
+    buildTemplateTasks(today.getFullYear(), today.getMonth())
+      .forEach(t => upsertTask(t, { skipRender: true }));
+    setGoal(key, "クライアント対応と自分の投稿、両方を滞りなく進める");
+    markSeeded();
     showSeedBanner();
+    render();
+  }
+
+  // db mode: the first device to connect a brand-new (empty) shared store
+  // contributes whatever it already had locally, instead of overwriting it
+  // with the generic template.
+  function attachDbSync(localSnapshot) {
+    let tasksLoaded = false, metaLoaded = false;
+
+    function checkSeed() {
+      if (!tasksLoaded || !metaLoaded || seeded) return;
+      if (allTasks.length === 0 && localSnapshot.hadData) {
+        localSnapshot.tasks.forEach(t => upsertTask(t, { skipRender: true }));
+        Object.keys(localSnapshot.goals).forEach(k => setGoal(k, localSnapshot.goals[k]));
+        localSnapshot.anytime.forEach(t => upsertAnytime(t, { skipRender: true }));
+        markSeeded();
+        render();
+        renderAnytime();
+        return;
+      }
+      maybeSeed();
+    }
+
+    db.collection("tasks").onSnapshot(snap => {
+      allTasks = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      tasksLoaded = true;
+      render();
+      checkSeed();
+    }, handleDbError);
+
+    db.collection("goals").onSnapshot(snap => {
+      const g = {};
+      snap.docs.forEach(d => { g[d.id] = (d.data() || {}).text || ""; });
+      goals = g;
+      render();
+    }, handleDbError);
+
+    db.collection("anytime").onSnapshot(snap => {
+      anytimeTasks = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      renderAnytime();
+    }, handleDbError);
+
+    db.doc("meta/state").onSnapshot(snap => {
+      seeded = !!(snap.exists && snap.data() && snap.data().seeded);
+      metaLoaded = true;
+      checkSeed();
+    }, handleDbError);
   }
 
   let seedBannerShown = false;
@@ -1052,19 +1204,8 @@
 
   // ---------- anytime list (no date, sits beside the calendar) ----------
 
-  const ANYTIME_KEY = "mtm:anytime";
   const anytimeListEl = document.getElementById("anytimeList");
   const anytimeCountEl = document.getElementById("anytimeCount");
-
-  function loadAnytime() {
-    try { return JSON.parse(localStorage.getItem(ANYTIME_KEY)) || []; }
-    catch (e) { return []; }
-  }
-  function saveAnytime(list) {
-    try { localStorage.setItem(ANYTIME_KEY, JSON.stringify(list)); } catch (e) {}
-  }
-
-  let anytimeTasks = loadAnytime();
   let editingAnytimeId = null;
 
   function renderAnytimeRow(task) {
@@ -1129,9 +1270,7 @@
     const doSave = () => {
       const v = titleInput.value.trim();
       if (!v) return;
-      const t = anytimeTasks.find(x => x.id === task.id);
-      if (t) t.title = v;
-      saveAnytime(anytimeTasks);
+      upsertAnytime(Object.assign({}, task, { title: v }), { skipRender: true });
       editingAnytimeId = null;
       renderAnytime();
     };
@@ -1154,14 +1293,10 @@
   function toggleAnytime(id) {
     const t = anytimeTasks.find(x => x.id === id);
     if (!t) return;
-    t.done = !t.done;
-    saveAnytime(anytimeTasks);
-    renderAnytime();
+    upsertAnytime(Object.assign({}, t, { done: !t.done }));
   }
   function deleteAnytime(id) {
-    anytimeTasks = anytimeTasks.filter(x => x.id !== id);
-    saveAnytime(anytimeTasks);
-    renderAnytime();
+    removeAnytime(id);
   }
 
   function renderAnytime() {
@@ -1183,13 +1318,9 @@
     const input = document.getElementById("anytimeTitle");
     const v = input.value.trim();
     if (!v) return;
-    anytimeTasks.push({ id: uid(), title: v, done: false });
-    saveAnytime(anytimeTasks);
+    upsertAnytime({ id: uid(), title: v, done: false, createdAt: Date.now() });
     input.value = "";
-    renderAnytime();
   });
-
-  renderAnytime();
 
   // ---------- rendering ----------
 
@@ -1343,27 +1474,13 @@
   }
 
   function saveTaskEdit(task, newTitle, newCategory, newDate) {
-    const oldKey = task.date.slice(0, 7);
-    const oldMonthTasks = loadTasks(oldKey);
-    const idx = oldMonthTasks.findIndex(t => t.id === task.id);
-    if (idx === -1) { editingId = null; render(); return; }
-
-    const updated = Object.assign({}, oldMonthTasks[idx], {
-      title: newTitle, category: newCategory, date: newDate
-    });
-    oldMonthTasks.splice(idx, 1);
-    saveTasks(oldKey, oldMonthTasks);
-
+    upsertTask(Object.assign({}, task, { title: newTitle, category: newCategory, date: newDate }), { skipRender: true });
+    editingId = null;
     const newKey = newDate.slice(0, 7);
-    const newMonthTasks = newKey === oldKey ? oldMonthTasks : loadTasks(newKey);
-    newMonthTasks.push(updated);
-    saveTasks(newKey, newMonthTasks);
-
     if (newKey !== monthKey(viewDate)) {
       const [yy, mm] = newKey.split("-").map(Number);
       viewDate = new Date(yy, mm - 1, 1);
     }
-    editingId = null;
     render();
   }
 
@@ -1376,12 +1493,12 @@
 
   function render() {
     currentKey = monthKey(viewDate);
-    currentTasks = loadTasks(currentKey);
+    currentTasks = allTasks.filter(t => t.date.slice(0, 7) === currentKey);
 
     monthTitleEl.textContent = `${viewDate.getFullYear()}年${viewDate.getMonth() + 1}月`;
     todayDateEl.textContent = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日（${WEEKDAYS[today.getDay()]}）`;
 
-    goalInputEl.value = loadGoal(currentKey);
+    goalInputEl.value = goals[currentKey] || "";
 
     // stats (whole month)
     const total = currentTasks.length;
@@ -1397,9 +1514,7 @@
     const offset = RING_CIRC * (1 - pct / 100);
     ringProgressEl.style.strokeDashoffset = String(offset);
 
-    // today list — only meaningful when viewing the actual current month,
-    // otherwise show what's due on the 1st as a neutral placeholder is confusing,
-    // so we always compute against the real "today" regardless of viewDate.
+    // today list is computed against the real "today" regardless of viewDate
     renderTodayList();
 
     // seed banner
@@ -1420,10 +1535,8 @@
 
   function renderTodayList() {
     todayListEl.innerHTML = "";
-    const key = monthKey(today);
-    const tasks = key === currentKey ? currentTasks : loadTasks(key);
     const todayISO = toISO(today);
-    const dueToday = tasks.filter(t => t.date === todayISO);
+    const dueToday = allTasks.filter(t => t.date === todayISO);
 
     if (!dueToday.length) {
       const empty = document.createElement("div");
@@ -1499,17 +1612,13 @@
   }
 
   function toggleTask(id) {
-    const t = currentTasks.find(t => t.id === id);
+    const t = allTasks.find(x => x.id === id);
     if (!t) return;
-    t.done = !t.done;
-    saveTasks(currentKey, currentTasks);
-    render();
+    upsertTask(Object.assign({}, t, { done: !t.done }));
   }
 
   function deleteTask(id) {
-    currentTasks = currentTasks.filter(t => t.id !== id);
-    saveTasks(currentKey, currentTasks);
-    render();
+    removeTaskEverywhere(id);
   }
 
   document.getElementById("prevMonth").addEventListener("click", () => {
@@ -1521,7 +1630,7 @@
     render();
   });
 
-  goalInputEl.addEventListener("input", () => saveGoal(currentKey, goalInputEl.value));
+  goalInputEl.addEventListener("input", () => setGoal(currentKey, goalInputEl.value));
 
   document.getElementById("addForm").addEventListener("submit", e => {
     e.preventDefault();
@@ -1536,14 +1645,9 @@
       return;
     }
 
-    // dates may span multiple months, so group writes by month key
-    const byMonth = new Map();
-    dates.forEach(d => {
-      const key = d.slice(0, 7);
-      if (!byMonth.has(key)) byMonth.set(key, key === currentKey ? currentTasks : loadTasks(key));
-      byMonth.get(key).push({ id: uid(), date: d, title, category, done: false });
+    dates.forEach((d, i) => {
+      upsertTask({ id: uid(), date: d, title, category, done: false, createdAt: Date.now() + i }, { skipRender: true });
     });
-    byMonth.forEach((tasks, key) => saveTasks(key, tasks));
 
     // jump to the month of the earliest selected date
     const [yy, mm] = dates[0].slice(0, 7).split("-").map(Number);
@@ -1563,14 +1667,35 @@
     const label = `${viewDate.getFullYear()}年${viewDate.getMonth() + 1}月`;
     const ok = window.confirm(`${label}のタスクをテンプレートで入れ直します。この月に追加・編集した内容は失われます。よろしいですか？`);
     if (!ok) return;
-    const key = monthKey(viewDate);
-    saveTasks(key, buildTemplateTasks(viewDate.getFullYear(), viewDate.getMonth()));
-    render();
+    replaceMonthTasks(viewDate.getFullYear(), viewDate.getMonth(), buildTemplateTasks(viewDate.getFullYear(), viewDate.getMonth()));
   });
 
-  seedIfNeeded();
-  render();
+  // ---------- startup ----------
+
+  function init() {
+    lsLoadAll();
+    const localSnapshot = {
+      tasks: allTasks.slice(),
+      goals: Object.assign({}, goals),
+      anytime: anytimeTasks.slice(),
+      hadData: allTasks.length > 0 || Object.keys(goals).length > 0 || anytimeTasks.length > 0
+    };
+    render();
+    renderAnytime();
+
+    const canUseDb = window.claude && typeof window.claude.use === "function";
+    if (!canUseDb) { maybeSeed(); return; }
+
+    window.claude.use("db").then(resolved => {
+      if (!resolved) { maybeSeed(); return; }
+      db = resolved;
+      attachDbSync(localSnapshot);
+    }).catch((e) => { console.error("db init failed:", e); maybeSeed(); });
+  }
+
+  init();
 })();
+
 </script>
 </body>
 </html>
