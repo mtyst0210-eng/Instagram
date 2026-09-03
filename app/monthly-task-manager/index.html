@@ -259,6 +259,130 @@
   .field-row { display: flex; gap: 18px; }
   .field-row .field { flex: 1; }
 
+  .date-field { position: relative; }
+
+  .date-picker-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    padding: 4px 1px 8px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .15s;
+  }
+  .date-picker-trigger svg { flex: none; color: var(--text-muted); transition: transform .15s; }
+  .date-picker-trigger[aria-expanded="true"] { border-bottom-color: var(--accent); }
+  .date-picker-trigger[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+  .date-picker-pop {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    box-shadow: var(--shadow);
+    padding: 18px;
+  }
+
+  .dp-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .dp-month {
+    font-family: "Shippori Mincho", serif;
+    font-size: 15px;
+  }
+  .dp-nav button {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dp-nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .dp-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 4px;
+  }
+  .dp-weekdays span {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  .dp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    row-gap: 2px;
+  }
+  .dp-grid .dp-day {
+    aspect-ratio: 1;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 12.5px;
+    font-family: "Shippori Mincho", serif;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    justify-self: center;
+    width: 30px;
+    position: relative;
+  }
+  .dp-grid .dp-day:hover { background: var(--surface-2); }
+  .dp-grid .dp-day.today { color: var(--accent); }
+  .dp-grid .dp-day.selected { background: var(--accent); color: var(--accent-contrast); }
+  .dp-grid .dp-day.empty { cursor: default; }
+  .dp-grid .dp-day.empty:hover { background: transparent; }
+
+  .dp-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .dp-actions button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    padding: 0;
+  }
+  .dp-actions button:hover { color: var(--accent); }
+  .dp-actions .dp-done {
+    margin-left: auto;
+    background: var(--ink);
+    color: var(--ink-contrast);
+    padding: 7px 16px;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+  }
+  .dp-actions .dp-done:hover { color: var(--ink-contrast); opacity: 0.82; }
+
   button.primary {
     background: var(--ink);
     color: var(--ink-contrast);
@@ -563,18 +687,28 @@
             <option value="other">その他</option>
           </select>
         </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="taskDate">日付</label>
-            <input type="date" id="taskDate" required />
-          </div>
-          <div class="field">
-            <label for="taskRepeat">繰り返し</label>
-            <select id="taskRepeat">
-              <option value="once">この日だけ</option>
-              <option value="daily">月末まで毎日</option>
-              <option value="weekly">月末まで毎週この曜日</option>
-            </select>
+        <div class="field date-field">
+          <label for="datePickerBtn">日にち（複数選択可）</label>
+          <button type="button" class="date-picker-trigger" id="datePickerBtn" aria-haspopup="true" aria-expanded="false">
+            <span id="datePickerSummary">日付を選択</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="date-picker-pop" id="datePickerPop" hidden>
+            <div class="dp-nav">
+              <button type="button" id="dpPrev" aria-label="前の月">‹</button>
+              <div class="dp-month" id="dpMonthLabel"></div>
+              <button type="button" id="dpNext" aria-label="次の月">›</button>
+            </div>
+            <div class="dp-weekdays">
+              <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+            </div>
+            <div class="dp-grid" id="dpGrid"></div>
+            <div class="dp-actions">
+              <button type="button" id="dpSelectAll">すべて</button>
+              <button type="button" id="dpSelectWeekday">平日のみ</button>
+              <button type="button" id="dpClear">クリア</button>
+              <button type="button" id="dpDone" class="dp-done">決定</button>
+            </div>
           </div>
         </div>
         <button type="submit" class="primary">追加する</button>
@@ -688,23 +822,110 @@
   let seedBannerShown = false;
   function showSeedBanner() { seedBannerShown = true; }
 
-  function generateOccurrences(baseDateStr, repeat) {
-    const base = new Date(baseDateStr + "T00:00:00");
-    const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-    const dates = [];
-    if (repeat === "once") {
-      dates.push(toISO(base));
-    } else if (repeat === "daily") {
-      for (let d = base.getDate(); d <= lastDay; d++) {
-        dates.push(toISO(new Date(base.getFullYear(), base.getMonth(), d)));
-      }
-    } else if (repeat === "weekly") {
-      for (let d = base.getDate(); d <= lastDay; d += 7) {
-        dates.push(toISO(new Date(base.getFullYear(), base.getMonth(), d)));
-      }
-    }
-    return dates;
+  // ---------- date picker (multi-select calendar dropdown) ----------
+
+  const datePickerBtn = document.getElementById("datePickerBtn");
+  const datePickerPop = document.getElementById("datePickerPop");
+  const datePickerSummary = document.getElementById("datePickerSummary");
+  const dpMonthLabelEl = document.getElementById("dpMonthLabel");
+  const dpGridEl = document.getElementById("dpGrid");
+
+  let dpViewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  const selectedDates = new Set([toISO(today)]);
+
+  function formatDateJP(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return `${y}年${m}月${d}日`;
   }
+
+  function updateDatePickerSummary() {
+    const n = selectedDates.size;
+    if (n === 0) datePickerSummary.textContent = "日付を選択";
+    else if (n === 1) datePickerSummary.textContent = formatDateJP([...selectedDates][0]);
+    else datePickerSummary.textContent = `${formatDateJP([...selectedDates].sort()[0])} 他${n - 1}日`;
+  }
+
+  function renderDatePicker() {
+    const year = dpViewDate.getFullYear(), month = dpViewDate.getMonth();
+    dpMonthLabelEl.textContent = `${year}年${month + 1}月`;
+    dpGridEl.innerHTML = "";
+
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstWeekday; i++) {
+      const filler = document.createElement("div");
+      filler.className = "dp-day empty";
+      dpGridEl.appendChild(filler);
+    }
+    for (let d = 1; d <= lastDay; d++) {
+      const iso = toISO(new Date(year, month, d));
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dp-day";
+      if (iso === toISO(today)) btn.classList.add("today");
+      if (selectedDates.has(iso)) btn.classList.add("selected");
+      btn.textContent = String(d);
+      btn.addEventListener("click", () => {
+        if (selectedDates.has(iso)) selectedDates.delete(iso);
+        else selectedDates.add(iso);
+        renderDatePicker();
+        updateDatePickerSummary();
+      });
+      dpGridEl.appendChild(btn);
+    }
+  }
+
+  function openDatePicker() {
+    datePickerPop.hidden = false;
+    datePickerBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeDatePicker() {
+    datePickerPop.hidden = true;
+    datePickerBtn.setAttribute("aria-expanded", "false");
+  }
+
+  datePickerBtn.addEventListener("click", () => {
+    if (datePickerPop.hidden) openDatePicker(); else closeDatePicker();
+  });
+  document.addEventListener("click", e => {
+    if (!datePickerPop.hidden && !e.target.closest(".date-field")) closeDatePicker();
+  }, true);
+  document.getElementById("dpPrev").addEventListener("click", () => {
+    dpViewDate = new Date(dpViewDate.getFullYear(), dpViewDate.getMonth() - 1, 1);
+    renderDatePicker();
+  });
+  document.getElementById("dpNext").addEventListener("click", () => {
+    dpViewDate = new Date(dpViewDate.getFullYear(), dpViewDate.getMonth() + 1, 1);
+    renderDatePicker();
+  });
+  document.getElementById("dpSelectAll").addEventListener("click", () => {
+    const year = dpViewDate.getFullYear(), month = dpViewDate.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= lastDay; d++) selectedDates.add(toISO(new Date(year, month, d)));
+    renderDatePicker();
+    updateDatePickerSummary();
+  });
+  document.getElementById("dpSelectWeekday").addEventListener("click", () => {
+    const year = dpViewDate.getFullYear(), month = dpViewDate.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= lastDay; d++) {
+      const date = new Date(year, month, d);
+      const wd = date.getDay();
+      if (wd !== 0 && wd !== 6) selectedDates.add(toISO(date));
+    }
+    renderDatePicker();
+    updateDatePickerSummary();
+  });
+  document.getElementById("dpClear").addEventListener("click", () => {
+    selectedDates.clear();
+    renderDatePicker();
+    updateDatePickerSummary();
+  });
+  document.getElementById("dpDone").addEventListener("click", () => closeDatePicker());
+
+  renderDatePicker();
+  updateDatePickerSummary();
 
   // ---------- rendering ----------
 
@@ -952,29 +1173,35 @@
     e.preventDefault();
     const titleEl = document.getElementById("taskTitle");
     const categoryEl = document.getElementById("taskCategory");
-    const dateEl = document.getElementById("taskDate");
-    const repeatEl = document.getElementById("taskRepeat");
 
     const title = titleEl.value.trim();
     const category = categoryEl.value;
-    const dateVal = dateEl.value;
-    if (!title || !dateVal) return;
+    const dates = [...selectedDates].sort();
+    if (!title || !dates.length) {
+      if (!dates.length) openDatePicker();
+      return;
+    }
 
-    const dates = generateOccurrences(dateVal, repeatEl.value);
-    const targetKey = dateVal.slice(0, 7);
-    const targetTasks = targetKey === currentKey ? currentTasks : loadTasks(targetKey);
+    // dates may span multiple months, so group writes by month key
+    const byMonth = new Map();
+    dates.forEach(d => {
+      const key = d.slice(0, 7);
+      if (!byMonth.has(key)) byMonth.set(key, key === currentKey ? currentTasks : loadTasks(key));
+      byMonth.get(key).push({ id: uid(), date: d, title, category, done: false });
+    });
+    byMonth.forEach((tasks, key) => saveTasks(key, tasks));
 
-    dates.forEach(d => targetTasks.push({ id: uid(), date: d, title, category, done: false }));
-    saveTasks(targetKey, targetTasks);
-
-    // jump to the month the new task(s) belong to
-    const [yy, mm] = targetKey.split("-").map(Number);
+    // jump to the month of the earliest selected date
+    const [yy, mm] = dates[0].slice(0, 7).split("-").map(Number);
     viewDate = new Date(yy, mm - 1, 1);
 
     titleEl.value = "";
-    dateEl.value = "";
     categoryEl.value = "agency";
-    repeatEl.value = "once";
+    selectedDates.clear();
+    selectedDates.add(toISO(today));
+    dpViewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    renderDatePicker();
+    updateDatePickerSummary();
     render();
   });
 
@@ -986,8 +1213,6 @@
     saveTasks(key, buildTemplateTasks(viewDate.getFullYear(), viewDate.getMonth()));
     render();
   });
-
-  document.getElementById("taskDate").value = toISO(today);
 
   seedIfNeeded();
   render();
