@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>月間タスク管理</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,380..600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f3ee;
+    --surface: #ffffff;
+    --surface-2: #e8e9e2;
+    --border: #d7d9cf;
+    --text: #1f241f;
+    --text-muted: #656b5e;
+    --accent: #2f6f5e;
+    --accent-soft: #dcece5;
+    --accent-contrast: #ffffff;
+    --danger: #b5482d;
+    --danger-soft: #f5e2db;
+    --ring-track: #e2e4da;
+    --shadow: 0 1px 2px rgba(31,36,31,0.06), 0 8px 24px -12px rgba(31,36,31,0.15);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141713;
+      --surface: #1b1f1a;
+      --surface-2: #23281f;
+      --border: #333a2e;
+      --text: #e9ebe3;
+      --text-muted: #9aa192;
+      --accent: #64bfa3;
+      --accent-soft: #223730;
+      --accent-contrast: #0d1410;
+      --danger: #e08d6e;
+      --danger-soft: #3a2620;
+      --ring-track: #2a2f26;
+      --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #141713;
+    --surface: #1b1f1a;
+    --surface-2: #23281f;
+    --border: #333a2e;
+    --text: #e9ebe3;
+    --text-muted: #9aa192;
+    --accent: #64bfa3;
+    --accent-soft: #223730;
+    --accent-contrast: #0d1410;
+    --danger: #e08d6e;
+    --danger-soft: #3a2620;
+    --ring-track: #2a2f26;
+    --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; padding: 24px 16px 60px; }
+  }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  .brand {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 500;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+  }
+
+  /* ---------- sidebar ---------- */
+  .sidebar {
+    position: sticky;
+    top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .month-nav button {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 15px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .month-nav button:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .month-nav button:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  .month-title {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 24px;
+    font-weight: 480;
+  }
+
+  .ring-wrap {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .ring-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .ring-num .pct { font-size: 26px; font-weight: 500; }
+  .ring-num .pct-sign { font-size: 14px; color: var(--text-muted); }
+  .ring-num .sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+
+  .stat-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .stat {
+    flex: 1;
+    background: var(--surface-2);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .stat .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .stat .l { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .stat.danger .n { color: var(--danger); }
+
+  .goal-label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .goal-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13.5px;
+    font-family: inherit;
+  }
+
+  form.add-task { display: flex; flex-direction: column; gap: 10px; }
+  .field label {
+    display: block;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .field input[type="text"], .field input[type="date"], .field select {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+
+  button.primary {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border: none;
+    border-radius: 9px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button.primary:hover { filter: brightness(1.05); }
+
+  /* ---------- main ---------- */
+  .main { display: flex; flex-direction: column; gap: 22px; }
+
+  .today-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .today-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .today-head .today-title {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 21px;
+  }
+  .today-head .today-date {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .task-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 4px;
+    border-radius: 8px;
+  }
+  .task-row:hover { background: var(--surface-2); }
+
+  .task-row .chk {
+    width: 19px; height: 19px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent-contrast);
+  }
+  .task-row .chk.done { background: var(--accent); border-color: var(--accent); }
+  .task-row .chk svg { width: 12px; height: 12px; display: none; }
+  .task-row .chk.done svg { display: block; }
+
+  .task-row .title { flex: 1; font-size: 14.5px; }
+  .task-row.done .title { color: var(--text-muted); text-decoration: line-through; }
+
+  .task-row .badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    flex: none;
+  }
+  .task-row .badge.overdue { background: var(--danger-soft); color: var(--danger); }
+
+  .task-row .del {
+    flex: none;
+    width: 22px; height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 15px;
+    line-height: 1;
+    opacity: 0;
+  }
+  .task-row:hover .del { opacity: 1; }
+  .task-row .del:hover { background: var(--danger-soft); color: var(--danger); }
+
+  .empty-note {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    padding: 6px 4px;
+  }
+
+  .seed-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .seed-banner button {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    flex: none;
+  }
+
+  .weeks { display: flex; flex-direction: column; gap: 14px; }
+
+  .week-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .week-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .week-head .label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .week-head .frac {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .day-row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 14px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .day-row:first-of-type { border-top: none; }
+  .day-row.today { background: var(--accent-soft); border-radius: 8px; padding-left: 6px; margin-left: -6px; }
+
+  .day-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    padding-top: 8px;
+  }
+  .day-num .n { font-size: 17px; font-weight: 500; }
+  .day-num .w { display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
+
+  .day-tasks { display: flex; flex-direction: column; }
+  .day-tasks .empty-note { padding: 8px 4px; font-size: 12.5px; }
+
+  footer.hint {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">月間タスク管理</div>
+
+    <div class="card">
+      <div class="month-nav">
+        <button id="prevMonth" aria-label="前の月">‹</button>
+        <div class="month-title" id="monthTitle"></div>
+        <button id="nextMonth" aria-label="次の月">›</button>
+      </div>
+
+      <div class="ring-wrap">
+        <svg width="76" height="76" viewBox="0 0 76 76" role="img" aria-label="今月の達成率">
+          <circle cx="38" cy="38" r="32" fill="none" stroke="var(--ring-track)" stroke-width="8"/>
+          <circle id="ringProgress" cx="38" cy="38" r="32" fill="none" stroke="var(--accent)" stroke-width="8"
+                  stroke-linecap="round" transform="rotate(-90 38 38)"/>
+        </svg>
+        <div class="ring-num">
+          <div><span class="pct" id="pctText">0</span><span class="pct-sign">%</span></div>
+          <div class="sub" id="doneOfTotal">0 / 0 件完了</div>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat">
+          <div class="n" id="statRemaining">0</div>
+          <div class="l">残タスク</div>
+        </div>
+        <div class="stat danger">
+          <div class="n" id="statOverdue">0</div>
+          <div class="l">期限超過</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="goal-label">今月の目標</div>
+        <input class="goal-input" id="goalInput" type="text" placeholder="例：リールを月4本、企画〜投稿まで完了させる" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="goal-label" style="margin-bottom:12px;">タスクを追加</div>
+      <form class="add-task" id="addForm">
+        <div class="field">
+          <label for="taskTitle">やること</label>
+          <input type="text" id="taskTitle" placeholder="例：台本を仕上げる" required />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="taskDate">日付</label>
+            <input type="date" id="taskDate" required />
+          </div>
+          <div class="field">
+            <label for="taskRepeat">繰り返し</label>
+            <select id="taskRepeat">
+              <option value="once">この日だけ</option>
+              <option value="daily">月末まで毎日</option>
+              <option value="weekly">月末まで毎週この曜日</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="primary">追加する</button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="today-card">
+      <div class="today-head">
+        <div class="today-title">今日やること</div>
+        <div class="today-date" id="todayDate"></div>
+      </div>
+      <div class="task-list" id="todayList"></div>
+    </section>
+
+    <section>
+      <div id="seedBannerWrap"></div>
+      <div class="weeks" id="weeks"></div>
+      <footer class="hint">タスクはこの端末のブラウザ内に保存されます（他の端末とは共有されません）。</footer>
+    </section>
+  </main>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const STORAGE_PREFIX = "mtm:tasks:";
+  const GOAL_PREFIX = "mtm:goal:";
+  const SEED_FLAG = "mtm:seeded";
+
+  const pad2 = n => String(n).padStart(2, "0");
+  const toISO = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const monthKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+  const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+
+  const WEEKDAYS = ["日","月","火","水","木","金","土"];
+
+  let today = startOfDay(new Date());
+  let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  function loadTasks(key) {
+    try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + key)) || []; }
+    catch (e) { return []; }
+  }
+  function saveTasks(key, tasks) {
+    try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(tasks)); } catch (e) {}
+  }
+  function loadGoal(key) {
+    try { return localStorage.getItem(GOAL_PREFIX + key) || ""; } catch (e) { return ""; }
+  }
+  function saveGoal(key, val) {
+    try { localStorage.setItem(GOAL_PREFIX + key, val); } catch (e) {}
+  }
+
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  function seedIfNeeded() {
+    try { if (localStorage.getItem(SEED_FLAG)) return; } catch (e) { return; }
+    const key = monthKey(today);
+    const existing = loadTasks(key);
+    if (existing.length) { localStorage.setItem(SEED_FLAG, "1"); return; }
+
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const clamp = n => Math.min(Math.max(n, 1), lastDay);
+    const dateOf = day => toISO(new Date(today.getFullYear(), today.getMonth(), clamp(day)));
+
+    const plan = [
+      { d: today.getDate() - 6, title: "次のリールの企画を決める", done: true },
+      { d: today.getDate() - 3, title: "台本を書く（構成・テロップ案）", done: true },
+      { d: today.getDate() - 1, title: "素材を撮影する", done: false },
+      { d: today.getDate(),     title: "コンタクトシートで撮れ高を確認する", done: false },
+      { d: today.getDate() + 2, title: "カット割り・テロップ合成", done: false },
+      { d: today.getDate() + 4, title: "ラフカットを見直す", done: false },
+      { d: today.getDate() + 5, title: "投稿前チェックリストで確認", done: false },
+      { d: today.getDate() + 6, title: "投稿する（アプリ内でBGMを付ける）", done: false },
+      { d: today.getDate() + 8, title: "インサイトを確認する", done: false },
+      { d: today.getDate() + 12,title: "投稿を分析してdocsにまとめる", done: false },
+      { d: today.getDate() + 18,title: "来月分の企画候補を3つ出す", done: false },
+    ];
+
+    const tasks = plan.map(p => ({
+      id: uid(),
+      date: dateOf(p.d),
+      title: p.title,
+      done: !!p.done
+    }));
+
+    saveTasks(key, tasks);
+    saveGoal(key, "リールを2本、企画〜投稿〜振り返りまで完了させる");
+    localStorage.setItem(SEED_FLAG, "1");
+    showSeedBanner();
+  }
+
+  let seedBannerShown = false;
+  function showSeedBanner() { seedBannerShown = true; }
+
+  function generateOccurrences(baseDateStr, repeat) {
+    const base = new Date(baseDateStr + "T00:00:00");
+    const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    const dates = [];
+    if (repeat === "once") {
+      dates.push(toISO(base));
+    } else if (repeat === "daily") {
+      for (let d = base.getDate(); d <= lastDay; d++) {
+        dates.push(toISO(new Date(base.getFullYear(), base.getMonth(), d)));
+      }
+    } else if (repeat === "weekly") {
+      for (let d = base.getDate(); d <= lastDay; d += 7) {
+        dates.push(toISO(new Date(base.getFullYear(), base.getMonth(), d)));
+      }
+    }
+    return dates;
+  }
+
+  // ---------- rendering ----------
+
+  const monthTitleEl = document.getElementById("monthTitle");
+  const todayDateEl = document.getElementById("todayDate");
+  const todayListEl = document.getElementById("todayList");
+  const weeksEl = document.getElementById("weeks");
+  const pctTextEl = document.getElementById("pctText");
+  const doneOfTotalEl = document.getElementById("doneOfTotal");
+  const statRemainingEl = document.getElementById("statRemaining");
+  const statOverdueEl = document.getElementById("statOverdue");
+  const ringProgressEl = document.getElementById("ringProgress");
+  const goalInputEl = document.getElementById("goalInput");
+  const seedBannerWrap = document.getElementById("seedBannerWrap");
+  const RING_CIRC = 2 * Math.PI * 32;
+  ringProgressEl.style.strokeDasharray = String(RING_CIRC);
+
+  function checkIcon() {
+    return '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function renderTaskRow(task, opts) {
+    opts = opts || {};
+    const row = document.createElement("div");
+    row.className = "task-row" + (task.done ? " done" : "");
+
+    const chk = document.createElement("button");
+    chk.className = "chk" + (task.done ? " done" : "");
+    chk.innerHTML = checkIcon();
+    chk.setAttribute("aria-label", task.done ? "完了を取り消す" : "完了にする");
+    chk.addEventListener("click", () => toggleTask(task.id));
+
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = task.title;
+
+    row.appendChild(chk);
+    row.appendChild(title);
+
+    if (opts.badge) {
+      const badge = document.createElement("span");
+      badge.className = "badge" + (opts.overdue ? " overdue" : "");
+      badge.textContent = opts.badge;
+      row.appendChild(badge);
+    }
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "×";
+    del.setAttribute("aria-label", "削除");
+    del.addEventListener("click", () => deleteTask(task.id));
+    row.appendChild(del);
+
+    return row;
+  }
+
+  let currentKey = "";
+  let currentTasks = [];
+
+  function currentMonthLastDay() {
+    return new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+  }
+
+  function render() {
+    currentKey = monthKey(viewDate);
+    currentTasks = loadTasks(currentKey);
+
+    monthTitleEl.textContent = `${viewDate.getFullYear()}年${viewDate.getMonth() + 1}月`;
+    todayDateEl.textContent = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日（${WEEKDAYS[today.getDay()]}）`;
+
+    goalInputEl.value = loadGoal(currentKey);
+
+    // stats (whole month)
+    const total = currentTasks.length;
+    const done = currentTasks.filter(t => t.done).length;
+    const overdue = currentTasks.filter(t => !t.done && new Date(t.date + "T00:00:00") < today).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+
+    pctTextEl.textContent = pct;
+    doneOfTotalEl.textContent = `${done} / ${total} 件完了`;
+    statRemainingEl.textContent = total - done;
+    statOverdueEl.textContent = overdue;
+    const offset = RING_CIRC * (1 - pct / 100);
+    ringProgressEl.style.strokeDashoffset = String(offset);
+
+    // today list — only meaningful when viewing the actual current month,
+    // otherwise show what's due on the 1st as a neutral placeholder is confusing,
+    // so we always compute against the real "today" regardless of viewDate.
+    renderTodayList();
+
+    // seed banner
+    seedBannerWrap.innerHTML = "";
+    if (seedBannerShown && currentKey === monthKey(today)) {
+      const b = document.createElement("div");
+      b.className = "seed-banner";
+      b.innerHTML = `<span>サンプルのタスクを用意しました。内容は自由に編集・削除してください。</span>`;
+      const btn = document.createElement("button");
+      btn.textContent = "閉じる";
+      btn.addEventListener("click", () => { seedBannerShown = false; render(); });
+      b.appendChild(btn);
+      seedBannerWrap.appendChild(b);
+    }
+
+    renderWeeks();
+  }
+
+  function renderTodayList() {
+    todayListEl.innerHTML = "";
+    const key = monthKey(today);
+    const tasks = key === currentKey ? currentTasks : loadTasks(key);
+    const todayISO = toISO(today);
+
+    const dueToday = tasks.filter(t => t.date === todayISO);
+    const overdue = tasks.filter(t => !t.done && t.date < todayISO);
+
+    if (!dueToday.length && !overdue.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "今日の予定はありません。左のフォームからタスクを追加できます。";
+      todayListEl.appendChild(empty);
+      return;
+    }
+
+    overdue.sort((a, b) => a.date.localeCompare(b.date));
+    overdue.forEach(t => {
+      const daysLate = Math.round((today - new Date(t.date + "T00:00:00")) / 86400000);
+      todayListEl.appendChild(renderTaskRow(t, { badge: `${daysLate}日超過`, overdue: true }));
+    });
+    dueToday.forEach(t => todayListEl.appendChild(renderTaskRow(t)));
+  }
+
+  function renderWeeks() {
+    weeksEl.innerHTML = "";
+    const lastDay = currentMonthLastDay();
+    const year = viewDate.getFullYear(), month = viewDate.getMonth();
+
+    let day = 1;
+    while (day <= lastDay) {
+      const weekStart = day;
+      const weekCard = document.createElement("div");
+      weekCard.className = "week-card";
+
+      const daysThisWeek = [];
+      const firstWeekday = new Date(year, month, day).getDay();
+      let remainingInWeek = 7 - firstWeekday;
+      for (let i = 0; i < remainingInWeek && day <= lastDay; i++, day++) {
+        daysThisWeek.push(day);
+      }
+
+      const weekTasks = currentTasks.filter(t => {
+        const dd = Number(t.date.slice(8, 10));
+        return dd >= weekStart && dd <= daysThisWeek[daysThisWeek.length - 1];
+      });
+      const weekDone = weekTasks.filter(t => t.done).length;
+
+      const head = document.createElement("div");
+      head.className = "week-head";
+      head.innerHTML = `<span class="label">${weekStart}日〜${daysThisWeek[daysThisWeek.length - 1]}日</span>
+                         <span class="frac">${weekDone} / ${weekTasks.length}</span>`;
+      weekCard.appendChild(head);
+
+      daysThisWeek.forEach(d => {
+        const iso = toISO(new Date(year, month, d));
+        const isToday = iso === toISO(today);
+        const dayTasks = currentTasks.filter(t => t.date === iso)
+          .sort((a, b) => Number(a.done) - Number(b.done));
+
+        const row = document.createElement("div");
+        row.className = "day-row" + (isToday ? " today" : "");
+
+        const num = document.createElement("div");
+        num.className = "day-num";
+        num.innerHTML = `<span class="n">${d}</span><span class="w">${WEEKDAYS[new Date(year, month, d).getDay()]}</span>`;
+        row.appendChild(num);
+
+        const list = document.createElement("div");
+        list.className = "day-tasks";
+        if (!dayTasks.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-note";
+          empty.textContent = "予定なし";
+          list.appendChild(empty);
+        } else {
+          dayTasks.forEach(t => list.appendChild(renderTaskRow(t)));
+        }
+        row.appendChild(list);
+        weekCard.appendChild(row);
+      });
+
+      weeksEl.appendChild(weekCard);
+    }
+  }
+
+  function toggleTask(id) {
+    const t = currentTasks.find(t => t.id === id);
+    if (!t) return;
+    t.done = !t.done;
+    saveTasks(currentKey, currentTasks);
+    render();
+  }
+
+  function deleteTask(id) {
+    currentTasks = currentTasks.filter(t => t.id !== id);
+    saveTasks(currentKey, currentTasks);
+    render();
+  }
+
+  document.getElementById("prevMonth").addEventListener("click", () => {
+    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+    render();
+  });
+  document.getElementById("nextMonth").addEventListener("click", () => {
+    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+    render();
+  });
+
+  goalInputEl.addEventListener("input", () => saveGoal(currentKey, goalInputEl.value));
+
+  document.getElementById("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const titleEl = document.getElementById("taskTitle");
+    const dateEl = document.getElementById("taskDate");
+    const repeatEl = document.getElementById("taskRepeat");
+
+    const title = titleEl.value.trim();
+    const dateVal = dateEl.value;
+    if (!title || !dateVal) return;
+
+    const dates = generateOccurrences(dateVal, repeatEl.value);
+    const targetKey = dateVal.slice(0, 7);
+    const targetTasks = targetKey === currentKey ? currentTasks : loadTasks(targetKey);
+
+    dates.forEach(d => targetTasks.push({ id: uid(), date: d, title, done: false }));
+    saveTasks(targetKey, targetTasks);
+
+    // jump to the month the new task(s) belong to
+    const [yy, mm] = targetKey.split("-").map(Number);
+    viewDate = new Date(yy, mm - 1, 1);
+
+    titleEl.value = "";
+    dateEl.value = "";
+    repeatEl.value = "once";
+    render();
+  });
+
+  document.getElementById("taskDate").value = toISO(today);
+
+  seedIfNeeded();
+  render();
+})();
+</script>
+</body>
+</html>
