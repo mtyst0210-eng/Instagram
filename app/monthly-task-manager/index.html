@@ -96,6 +96,10 @@
     .app { grid-template-columns: 1fr; padding: 32px 20px 72px; gap: 32px; }
   }
 
+  @media (min-width: 861px) {
+    .app { max-width: 1320px; grid-template-columns: 260px 1fr 260px; gap: 32px; }
+  }
+
   h1, h2, h3 { text-wrap: balance; margin: 0; }
 
   .brand {
@@ -116,10 +120,15 @@
   }
 
   @media (min-width: 861px) {
-    .sidebar {
+    .sidebar, .anytime-panel {
       position: sticky;
       top: 24px;
     }
+  }
+
+  .anytime-panel {
+    display: flex;
+    flex-direction: column;
   }
 
   .card {
@@ -426,7 +435,11 @@
     font-size: 13px;
     color: var(--text-muted);
   }
-  .anytime-list { margin-bottom: 14px; }
+  .anytime-list {
+    margin-bottom: 14px;
+    max-height: 46vh;
+    overflow-y: auto;
+  }
   .anytime-add {
     display: flex;
     gap: 12px;
@@ -817,18 +830,6 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="anytime-head">
-        <div class="goal-label" style="margin-bottom:0;">時間が空いたら進める</div>
-        <div class="anytime-count" id="anytimeCount">0 / 0</div>
-      </div>
-      <div class="task-list anytime-list" id="anytimeList"></div>
-      <form class="anytime-add" id="anytimeForm">
-        <input type="text" id="anytimeTitle" placeholder="例：来月の企画を考える" required />
-        <button type="submit">追加</button>
-      </form>
-    </div>
-
     <button type="button" class="text-link" id="resetTemplateBtn">この月をテンプレートで入れ直す</button>
   </aside>
 
@@ -847,6 +848,20 @@
       <footer class="hint">タスクはこの端末のブラウザ内に保存されます（他の端末とは共有されません）。</footer>
     </section>
   </main>
+
+  <aside class="anytime-panel">
+    <div class="card">
+      <div class="anytime-head">
+        <div class="goal-label" style="margin-bottom:0;">時間が空いたら進める</div>
+        <div class="anytime-count" id="anytimeCount">0 / 0</div>
+      </div>
+      <div class="task-list anytime-list" id="anytimeList"></div>
+      <form class="anytime-add" id="anytimeForm">
+        <input type="text" id="anytimeTitle" placeholder="例：来月の企画を考える" required />
+        <button type="submit">追加</button>
+      </form>
+    </div>
+  </aside>
 
 </div>
 
