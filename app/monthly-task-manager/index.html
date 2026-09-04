@@ -1029,10 +1029,12 @@
 
   function markSeeded() {
     seeded = true;
-    if (db) db.doc("meta/state").set({ seeded: true }).catch(handleDbError);
-    else lsSaveSeeded();
+    lsSaveSeeded();
   }
 
+  // local-storage-only fallback (no db capability in this view): seed the
+  // generic template on this device's very first-ever launch. There is only
+  // one device involved here, so there is no cross-device race to worry about.
   function maybeSeed() {
     if (seeded) return;
     const key = monthKey(today);
@@ -1046,24 +1048,32 @@
     render();
   }
 
-  // db mode: the first device to connect a brand-new (empty) shared store
-  // contributes whatever it already had locally, instead of overwriting it
-  // with the generic template.
+  // db mode: never auto-fill the shared store with generic template content —
+  // that is what caused another device's real data to be shadowed once
+  // before. Instead, once this device's own view of the shared store has
+  // loaded, merge in anything this device already had locally that the
+  // shared store doesn't have yet (matched by id, so nothing is ever
+  // duplicated or overwritten). Safe to run on every connection.
   function attachDbSync(localSnapshot) {
-    let tasksLoaded = false, metaLoaded = false;
+    let tasksLoaded = false, goalsLoaded = false, anytimeLoaded = false, reconciled = false;
 
-    function checkSeed() {
-      if (!tasksLoaded || !metaLoaded || seeded) return;
-      if (allTasks.length === 0 && localSnapshot.hadData) {
-        localSnapshot.tasks.forEach(t => upsertTask(t, { skipRender: true }));
-        Object.keys(localSnapshot.goals).forEach(k => setGoal(k, localSnapshot.goals[k]));
-        localSnapshot.anytime.forEach(t => upsertAnytime(t, { skipRender: true }));
-        markSeeded();
-        render();
-        renderAnytime();
-        return;
-      }
-      maybeSeed();
+    function reconcileOnce() {
+      if (reconciled || !tasksLoaded || !goalsLoaded || !anytimeLoaded) return;
+      reconciled = true;
+
+      const existingTaskIds = new Set(allTasks.map(t => t.id));
+      const missingTasks = localSnapshot.tasks.filter(t => !existingTaskIds.has(t.id));
+      missingTasks.forEach(t => upsertTask(t, { skipRender: true }));
+
+      const existingAnytimeIds = new Set(anytimeTasks.map(t => t.id));
+      const missingAnytime = localSnapshot.anytime.filter(t => !existingAnytimeIds.has(t.id));
+      missingAnytime.forEach(t => upsertAnytime(t, { skipRender: true }));
+
+      Object.keys(localSnapshot.goals).forEach(k => {
+        if (!goals[k]) setGoal(k, localSnapshot.goals[k]);
+      });
+
+      if (missingTasks.length || missingAnytime.length) { render(); renderAnytime(); }
     }
 
     db.collection("tasks").onSnapshot(snap => {
@@ -1071,26 +1081,24 @@
         .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       tasksLoaded = true;
       render();
-      checkSeed();
+      reconcileOnce();
     }, handleDbError);
 
     db.collection("goals").onSnapshot(snap => {
       const g = {};
       snap.docs.forEach(d => { g[d.id] = (d.data() || {}).text || ""; });
       goals = g;
+      goalsLoaded = true;
       render();
+      reconcileOnce();
     }, handleDbError);
 
     db.collection("anytime").onSnapshot(snap => {
       anytimeTasks = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
         .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      anytimeLoaded = true;
       renderAnytime();
-    }, handleDbError);
-
-    db.doc("meta/state").onSnapshot(snap => {
-      seeded = !!(snap.exists && snap.data() && snap.data().seeded);
-      metaLoaded = true;
-      checkSeed();
+      reconcileOnce();
     }, handleDbError);
   }
 
@@ -1677,8 +1685,7 @@
     const localSnapshot = {
       tasks: allTasks.slice(),
       goals: Object.assign({}, goals),
-      anytime: anytimeTasks.slice(),
-      hadData: allTasks.length > 0 || Object.keys(goals).length > 0 || anytimeTasks.length > 0
+      anytime: anytimeTasks.slice()
     };
     render();
     renderAnytime();
