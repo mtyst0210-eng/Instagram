@@ -522,6 +522,17 @@
     color: var(--text-muted);
   }
 
+  .overdue-card { border-left: 2px solid var(--danger); }
+  .overdue-title { color: var(--danger); }
+
+  .task-row .overdue-date {
+    font-family: "Shippori Mincho", serif;
+    font-style: italic;
+    font-size: 12px;
+    color: var(--danger);
+    flex: none;
+  }
+
   .task-list { display: flex; flex-direction: column; }
 
   .task-row {
@@ -842,10 +853,17 @@
       <div class="task-list" id="todayList"></div>
     </section>
 
+    <section class="today-card overdue-card" id="overdueSection" hidden>
+      <div class="today-head">
+        <div class="today-title overdue-title">チェックし忘れていませんか？</div>
+      </div>
+      <div class="task-list" id="overdueList"></div>
+    </section>
+
     <section>
       <div id="seedBannerWrap"></div>
       <div class="weeks" id="weeks"></div>
-      <footer class="hint">タスクはこの端末のブラウザ内に保存されます（他の端末とは共有されません）。</footer>
+      <footer class="hint">タスクはこのリンクを開いた端末どうしで共有されます。</footer>
     </section>
   </main>
 
@@ -1335,6 +1353,8 @@
   const monthTitleEl = document.getElementById("monthTitle");
   const todayDateEl = document.getElementById("todayDate");
   const todayListEl = document.getElementById("todayList");
+  const overdueSectionEl = document.getElementById("overdueSection");
+  const overdueListEl = document.getElementById("overdueList");
   const weeksEl = document.getElementById("weeks");
   const pctTextEl = document.getElementById("pctText");
   const doneOfTotalEl = document.getElementById("doneOfTotal");
@@ -1369,8 +1389,14 @@
   const CATEGORY_LABELS = { agency: "運用代行", own: "自身アカウント", other: "その他" };
   let editingId = null;
 
-  function renderTaskRow(task) {
+  function formatDateShort(iso) {
+    const [, m, d] = iso.split("-").map(Number);
+    return `${m}/${d}（${WEEKDAYS[new Date(iso + "T00:00:00").getDay()]}）`;
+  }
+
+  function renderTaskRow(task, opts) {
     if (task.id === editingId) return renderEditRow(task);
+    opts = opts || {};
 
     const row = document.createElement("div");
     row.className = "task-row" + (task.done ? " done" : "");
@@ -1383,6 +1409,12 @@
 
     const title = document.createElement("div");
     title.className = "title";
+    if (opts.showDate) {
+      const dateLabel = document.createElement("span");
+      dateLabel.className = "overdue-date";
+      dateLabel.textContent = formatDateShort(task.date);
+      title.appendChild(dateLabel);
+    }
     if (task.category && CATEGORY_LABELS[task.category]) {
       const dot = document.createElement("i");
       dot.className = "cat-dot cat-" + task.category;
@@ -1522,8 +1554,10 @@
     const offset = RING_CIRC * (1 - pct / 100);
     ringProgressEl.style.strokeDashoffset = String(offset);
 
-    // today list is computed against the real "today" regardless of viewDate
+    // today list and the overdue catch-up list are both computed against the
+    // real "today" regardless of viewDate
     renderTodayList();
+    renderOverdueList();
 
     // seed banner
     seedBannerWrap.innerHTML = "";
@@ -1555,6 +1589,20 @@
     }
 
     dueToday.forEach(t => todayListEl.appendChild(renderTaskRow(t)));
+  }
+
+  function renderOverdueList() {
+    const todayISO = toISO(today);
+    const overdue = allTasks.filter(t => !t.done && t.date < todayISO)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    overdueListEl.innerHTML = "";
+    if (!overdue.length) {
+      overdueSectionEl.hidden = true;
+      return;
+    }
+    overdueSectionEl.hidden = false;
+    overdue.forEach(t => overdueListEl.appendChild(renderTaskRow(t, { showDate: true })));
   }
 
   function renderWeeks() {
