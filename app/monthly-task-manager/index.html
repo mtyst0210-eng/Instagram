@@ -491,7 +491,8 @@
   .text-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
   /* ---------- main ---------- */
-  .main { display: flex; flex-direction: column; gap: 22px; }
+  .main { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .main > section { min-width: 0; }
 
   .today-card {
     background: var(--surface);
@@ -691,55 +692,88 @@
     flex: none;
   }
 
-  .weeks { display: flex; flex-direction: column; gap: 18px; }
+  .month-grid-scroll { overflow-x: auto; }
 
-  .week-card {
-    background: var(--surface);
+  .month-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+    gap: 1px;
+    margin-bottom: 8px;
+    min-width: 840px;
+  }
+  .month-weekdays span {
+    text-align: center;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .weeks {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+    gap: 1px;
+    min-width: 840px;
+    background: var(--border);
     border: 1px solid var(--border);
     border-radius: 2px;
-    padding: 22px 26px;
-    box-shadow: var(--shadow);
+    overflow: hidden;
   }
-  .week-head {
+
+  .day-cell {
+    position: relative;
+    background: var(--surface);
+    min-height: 112px;
+    padding: 8px 8px 6px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    gap: 4px;
   }
-  .week-head .label {
-    font-size: 10.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--text-muted);
-  }
-  .week-head .frac {
+  .day-cell.empty { background: var(--surface-2); }
+  .day-cell.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+  .cell-head { display: flex; justify-content: flex-end; }
+  .cell-daynum {
     font-family: "Shippori Mincho", serif;
-    font-size: 13px;
-    color: var(--text-muted);
+    font-size: 13.5px;
   }
+  .day-cell.today .cell-daynum { color: var(--accent); font-weight: 600; }
 
-  .day-row {
-    display: grid;
-    grid-template-columns: 52px 1fr;
-    gap: 16px;
-    padding: 11px 0;
-    border-top: 1px solid var(--border);
+  .cell-tasks { display: flex; flex-direction: column; gap: 3px; }
+  .cell-tasks .task-row {
+    border-bottom: none;
+    padding: 0;
+    gap: 6px;
   }
-  .day-row:first-of-type { border-top: none; }
-  .day-row.today { border-left: 2px solid var(--accent); padding-left: 12px; margin-left: -14px; }
-
-  .day-num {
-    font-family: "Shippori Mincho", serif;
-    padding-top: 9px;
+  .cell-tasks .task-row.compact .chk { width: 14px; height: 14px; }
+  .cell-tasks .task-row.compact .chk svg { width: 8px; height: 8px; }
+  .cell-tasks .task-row.compact .title {
+    font-size: 11.5px;
+    gap: 5px;
+    flex-wrap: nowrap;
+    min-width: 0;
   }
-  .day-num .n { font-size: 17px; font-weight: 500; }
-  .day-num .w { display: block; font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: "Zen Kaku Gothic New", sans-serif; letter-spacing: 0.05em; }
+  .cell-tasks .task-row.compact .title .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cell-tasks .task-row.compact .del { width: 16px; height: 16px; font-size: 12px; }
+  .cell-tasks .task-row.compact .del svg { width: 9px; height: 9px; }
 
-  .day-tasks { display: flex; flex-direction: column; }
-  .day-tasks .task-row { border-bottom: none; padding: 6px 2px; }
-  .day-tasks .empty-note { padding: 9px 2px; font-size: 12.5px; }
+  .day-cell .task-edit.grid-edit {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 270px;
+    z-index: 15;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    box-shadow: var(--shadow);
+    padding: 12px;
+  }
+  .day-cell .task-edit.grid-edit .edit-row { flex-wrap: wrap; row-gap: 8px; }
 
   footer.hint {
     color: var(--text-muted);
@@ -862,7 +896,12 @@
 
     <section>
       <div id="seedBannerWrap"></div>
-      <div class="weeks" id="weeks"></div>
+      <div class="month-grid-scroll">
+        <div class="month-weekdays">
+          <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+        </div>
+        <div class="weeks" id="weeks"></div>
+      </div>
       <footer class="hint">タスクはこのリンクを開いた端末どうしで共有されます。</footer>
     </section>
   </main>
@@ -1395,11 +1434,11 @@
   }
 
   function renderTaskRow(task, opts) {
-    if (task.id === editingId) return renderEditRow(task);
     opts = opts || {};
+    if (task.id === editingId) return renderEditRow(task, opts);
 
     const row = document.createElement("div");
-    row.className = "task-row" + (task.done ? " done" : "");
+    row.className = "task-row" + (task.done ? " done" : "") + (opts.compact ? " compact" : "");
 
     const chk = document.createElement("button");
     chk.className = "chk" + (task.done ? " done" : "");
@@ -1424,6 +1463,7 @@
     const label = document.createElement("span");
     label.className = "label";
     label.textContent = task.title;
+    if (opts.compact) label.title = task.title;
     title.appendChild(label);
 
     row.appendChild(chk);
@@ -1446,9 +1486,10 @@
     return row;
   }
 
-  function renderEditRow(task) {
+  function renderEditRow(task, opts) {
+    opts = opts || {};
     const row = document.createElement("div");
-    row.className = "task-row task-edit";
+    row.className = "task-row task-edit" + (opts.compact ? " grid-edit" : "");
 
     const titleInput = document.createElement("input");
     titleInput.type = "text";
@@ -1609,61 +1650,45 @@
     weeksEl.innerHTML = "";
     const lastDay = currentMonthLastDay();
     const year = viewDate.getFullYear(), month = viewDate.getMonth();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const todayISO = toISO(today);
 
-    let day = 1;
-    while (day <= lastDay) {
-      const weekStart = day;
-      const weekCard = document.createElement("div");
-      weekCard.className = "week-card";
+    // leading filler cells so day 1 lands under the correct weekday column
+    for (let i = 0; i < firstWeekday; i++) {
+      const filler = document.createElement("div");
+      filler.className = "day-cell empty";
+      weeksEl.appendChild(filler);
+    }
 
-      const daysThisWeek = [];
-      const firstWeekday = new Date(year, month, day).getDay();
-      let remainingInWeek = 7 - firstWeekday;
-      for (let i = 0; i < remainingInWeek && day <= lastDay; i++, day++) {
-        daysThisWeek.push(day);
-      }
+    for (let d = 1; d <= lastDay; d++) {
+      const iso = toISO(new Date(year, month, d));
+      const isToday = iso === todayISO;
+      const dayTasks = currentTasks.filter(t => t.date === iso)
+        .sort((a, b) => Number(a.done) - Number(b.done));
 
-      const weekTasks = currentTasks.filter(t => {
-        const dd = Number(t.date.slice(8, 10));
-        return dd >= weekStart && dd <= daysThisWeek[daysThisWeek.length - 1];
-      });
-      const weekDone = weekTasks.filter(t => t.done).length;
+      const cell = document.createElement("div");
+      cell.className = "day-cell" + (isToday ? " today" : "");
 
       const head = document.createElement("div");
-      head.className = "week-head";
-      head.innerHTML = `<span class="label">${weekStart}日〜${daysThisWeek[daysThisWeek.length - 1]}日</span>
-                         <span class="frac">${weekDone} / ${weekTasks.length}</span>`;
-      weekCard.appendChild(head);
+      head.className = "cell-head";
+      head.innerHTML = `<span class="cell-daynum">${d}</span>`;
+      cell.appendChild(head);
 
-      daysThisWeek.forEach(d => {
-        const iso = toISO(new Date(year, month, d));
-        const isToday = iso === toISO(today);
-        const dayTasks = currentTasks.filter(t => t.date === iso)
-          .sort((a, b) => Number(a.done) - Number(b.done));
+      const list = document.createElement("div");
+      list.className = "cell-tasks";
+      dayTasks.forEach(t => list.appendChild(renderTaskRow(t, { compact: true })));
+      cell.appendChild(list);
 
-        const row = document.createElement("div");
-        row.className = "day-row" + (isToday ? " today" : "");
+      weeksEl.appendChild(cell);
+    }
 
-        const num = document.createElement("div");
-        num.className = "day-num";
-        num.innerHTML = `<span class="n">${d}</span><span class="w">${WEEKDAYS[new Date(year, month, d).getDay()]}</span>`;
-        row.appendChild(num);
-
-        const list = document.createElement("div");
-        list.className = "day-tasks";
-        if (!dayTasks.length) {
-          const empty = document.createElement("div");
-          empty.className = "empty-note";
-          empty.textContent = "予定なし";
-          list.appendChild(empty);
-        } else {
-          dayTasks.forEach(t => list.appendChild(renderTaskRow(t)));
-        }
-        row.appendChild(list);
-        weekCard.appendChild(row);
-      });
-
-      weeksEl.appendChild(weekCard);
+    // trailing filler cells to complete the last row as a full rectangle
+    const totalCells = firstWeekday + lastDay;
+    const trailing = (7 - (totalCells % 7)) % 7;
+    for (let i = 0; i < trailing; i++) {
+      const filler = document.createElement("div");
+      filler.className = "day-cell empty";
+      weeksEl.appendChild(filler);
     }
   }
 
