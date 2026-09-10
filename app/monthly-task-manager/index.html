@@ -721,7 +721,13 @@
   .day-cell.empty { background: var(--surface-2); }
   .day-cell.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
 
-  .cell-head { display: flex; justify-content: flex-end; }
+  .cell-head { display: flex; justify-content: flex-end; align-items: baseline; gap: 8px; }
+  .cell-weekday {
+    display: none;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
   .cell-daynum {
     font-family: "Shippori Mincho", serif;
     font-size: 15px;
@@ -763,6 +769,56 @@
     padding: 12px;
   }
   .day-cell .task-edit.grid-edit .edit-row { flex-wrap: wrap; row-gap: 8px; }
+
+  /* below this width a 7-column grid leaves too little room per day for the
+     task text to be legible, so fall back to a full-width agenda list —
+     every day still shows, just stacked instead of gridded */
+  @media (max-width: 640px) {
+    .month-weekdays { display: none; }
+
+    .weeks { grid-template-columns: 1fr; gap: 0; border-left: none; border-right: none; }
+    .day-cell.empty { display: none; }
+
+    .day-cell {
+      min-height: 0;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .day-cell:last-child { border-bottom: none; }
+
+    .cell-head {
+      flex-direction: column-reverse;
+      align-items: center;
+      gap: 2px;
+      flex: none;
+      width: 34px;
+      padding-top: 2px;
+    }
+    .cell-weekday { display: block; }
+
+    .cell-tasks { flex: 1; gap: 8px; min-width: 0; }
+    .cell-tasks .task-row.compact .chk { width: 19px; height: 19px; }
+    .cell-tasks .task-row.compact .chk svg { width: 11px; height: 11px; }
+    .cell-tasks .task-row.compact .title { font-size: 14.5px; }
+    .cell-tasks .task-row.compact .title .label {
+      overflow: visible;
+      white-space: normal;
+      text-overflow: clip;
+    }
+    .cell-tasks .task-row.compact .del { width: 22px; height: 22px; font-size: 15px; }
+    .cell-tasks .task-row.compact .del svg { width: 12px; height: 12px; }
+
+    .day-cell .task-edit.grid-edit {
+      position: static;
+      width: auto;
+      box-shadow: none;
+      border-color: var(--border);
+      flex: 1;
+    }
+  }
 
   footer.hint {
     color: var(--text-muted);
@@ -1658,7 +1714,7 @@
 
       const head = document.createElement("div");
       head.className = "cell-head";
-      head.innerHTML = `<span class="cell-daynum">${d}</span>`;
+      head.innerHTML = `<span class="cell-weekday">${WEEKDAYS[new Date(year, month, d).getDay()]}</span><span class="cell-daynum">${d}</span>`;
       cell.appendChild(head);
 
       const list = document.createElement("div");
