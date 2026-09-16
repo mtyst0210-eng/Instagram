@@ -249,6 +249,16 @@
   }
   .goal-input:focus { border-bottom-color: var(--accent); outline: none; }
 
+  .goal-list { margin-bottom: 4px; }
+  .goal-row .title { align-items: flex-start; }
+  .goal-bullet {
+    flex: none;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 8px;
+  }
+
   form.add-task { display: flex; flex-direction: column; gap: 18px; }
   .field label {
     display: block;
@@ -872,7 +882,11 @@
 
       <div style="margin-top:16px;">
         <div class="goal-label">今月の目標</div>
-        <input class="goal-input" id="goalInput" type="text" placeholder="例：クライアント対応と自分の投稿、両方を滞りなく進める" />
+        <div class="task-list goal-list" id="goalList"></div>
+        <form class="anytime-add" id="goalForm">
+          <input type="text" id="goalItemInput" placeholder="例：クライアント対応と自分の投稿、両方を滞りなく進める" required />
+          <button type="submit">追加</button>
+        </form>
       </div>
     </div>
 
@@ -1000,7 +1014,7 @@
 
   let db = null;
   let allTasks = [];      // { id, date, title, category, done, createdAt }
-  let goals = {};         // { [monthKey]: text }
+  let goals = {};         // { [monthKey]: [{ id, text }] }
   let anytimeTasks = [];  // { id, title, done, createdAt }
   let seeded = false;
 
@@ -1008,6 +1022,13 @@
   const LS_GOALS = "mtm:v2:goals";
   const LS_ANYTIME = "mtm:v2:anytime";
   const LS_SEEDED = "mtm:v2:seeded";
+
+  // accepts the legacy single-string goal shape and normalizes it to a list
+  function normalizeGoalItems(v) {
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string" && v) return [{ id: uid(), text: v }];
+    return [];
+  }
 
   function lsSaveTasks() { try { localStorage.setItem(LS_TASKS, JSON.stringify(allTasks)); } catch (e) {} }
   function lsSaveGoals() { try { localStorage.setItem(LS_GOALS, JSON.stringify(goals)); } catch (e) {} }
@@ -1023,7 +1044,8 @@
           const monthTasks = JSON.parse(localStorage.getItem(key)) || [];
           allTasks = allTasks.concat(monthTasks);
         } else if (key.indexOf("mtm:goal:") === 0) {
-          goals[key.slice("mtm:goal:".length)] = localStorage.getItem(key);
+          const txt = localStorage.getItem(key);
+          if (txt) goals[key.slice("mtm:goal:".length)] = normalizeGoalItems(txt);
         } else if (key === "mtm:anytime") {
           anytimeTasks = JSON.parse(localStorage.getItem(key)) || [];
         }
@@ -1036,7 +1058,11 @@
 
   function lsLoadAll() {
     try { allTasks = JSON.parse(localStorage.getItem(LS_TASKS)) || []; } catch (e) { allTasks = []; }
-    try { goals = JSON.parse(localStorage.getItem(LS_GOALS)) || {}; } catch (e) { goals = {}; }
+    try {
+      const raw = JSON.parse(localStorage.getItem(LS_GOALS)) || {};
+      goals = {};
+      Object.keys(raw).forEach(k => { goals[k] = normalizeGoalItems(raw[k]); });
+    } catch (e) { goals = {}; }
     try { anytimeTasks = JSON.parse(localStorage.getItem(LS_ANYTIME)) || []; } catch (e) { anytimeTasks = []; }
     try { seeded = !!localStorage.getItem(LS_SEEDED); } catch (e) { seeded = false; }
     migrateOldLocalStorage();
@@ -1077,13 +1103,21 @@
     render();
   }
 
-  function setGoal(key, text) {
-    goals[key] = text;
+  function saveGoalItems(key, items) {
+    goals[key] = items;
     if (db) {
-      db.collection("goals").doc(key).set({ text }).catch(handleDbError);
+      db.collection("goals").doc(key).set({ items }).catch(handleDbError);
     } else {
       lsSaveGoals();
     }
+  }
+
+  function addGoalItem(key, text) {
+    saveGoalItems(key, (goals[key] || []).concat([{ id: uid(), text }]));
+  }
+
+  function removeGoalItem(key, id) {
+    saveGoalItems(key, (goals[key] || []).filter(g => g.id !== id));
   }
 
   function upsertAnytime(task, opts) {
@@ -1155,7 +1189,7 @@
     if (hasCurrentMonth) { markSeeded(); return; }
     buildTemplateTasks(today.getFullYear(), today.getMonth())
       .forEach(t => upsertTask(t, { skipRender: true }));
-    setGoal(key, "クライアント対応と自分の投稿、両方を滞りなく進める");
+    addGoalItem(key, "クライアント対応と自分の投稿、両方を滞りなく進める");
     markSeeded();
     showSeedBanner();
     render();
@@ -1183,7 +1217,10 @@
       missingAnytime.forEach(t => upsertAnytime(t, { skipRender: true }));
 
       Object.keys(localSnapshot.goals).forEach(k => {
-        if (!goals[k]) setGoal(k, localSnapshot.goals[k]);
+        const remoteItems = goals[k] || [];
+        const remoteIds = new Set(remoteItems.map(g => g.id));
+        const missingItems = (localSnapshot.goals[k] || []).filter(g => !remoteIds.has(g.id));
+        if (missingItems.length) saveGoalItems(k, remoteItems.concat(missingItems));
       });
 
       if (missingTasks.length || missingAnytime.length) { render(); renderAnytime(); }
@@ -1199,7 +1236,10 @@
 
     db.collection("goals").onSnapshot(snap => {
       const g = {};
-      snap.docs.forEach(d => { g[d.id] = (d.data() || {}).text || ""; });
+      snap.docs.forEach(d => {
+        const data = d.data() || {};
+        g[d.id] = normalizeGoalItems(data.items !== undefined ? data.items : data.text);
+      });
       goals = g;
       goalsLoaded = true;
       render();
@@ -1434,6 +1474,45 @@
     anytimeCountEl.textContent = `${done} / ${anytimeTasks.length}`;
   }
 
+  function renderGoalRow(key, item) {
+    const row = document.createElement("div");
+    row.className = "task-row goal-row";
+
+    const bullet = document.createElement("i");
+    bullet.className = "goal-bullet";
+
+    const title = document.createElement("div");
+    title.className = "title";
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = item.text;
+    title.appendChild(label);
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "×";
+    del.setAttribute("aria-label", "削除");
+    del.addEventListener("click", () => { removeGoalItem(key, item.id); renderGoals(); });
+
+    row.appendChild(bullet);
+    row.appendChild(title);
+    row.appendChild(del);
+    return row;
+  }
+
+  function renderGoals() {
+    const items = goals[currentKey] || [];
+    goalListEl.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "今月の目標を追加しましょう";
+      goalListEl.appendChild(empty);
+    } else {
+      items.forEach(item => goalListEl.appendChild(renderGoalRow(currentKey, item)));
+    }
+  }
+
   document.getElementById("anytimeForm").addEventListener("submit", e => {
     e.preventDefault();
     const input = document.getElementById("anytimeTitle");
@@ -1459,7 +1538,7 @@
   const statRemainingEl = document.getElementById("statRemaining");
   const statOverdueEl = document.getElementById("statOverdue");
   const ringProgressEl = document.getElementById("ringProgress");
-  const goalInputEl = document.getElementById("goalInput");
+  const goalListEl = document.getElementById("goalList");
   const seedBannerWrap = document.getElementById("seedBannerWrap");
   const ringStatusEl = document.getElementById("ringStatus");
   const RING_CIRC = 2 * Math.PI * 37;
@@ -1637,7 +1716,7 @@
     monthTitleEl.textContent = `${viewDate.getFullYear()}年${viewDate.getMonth() + 1}月`;
     todayDateEl.textContent = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日（${WEEKDAYS[today.getDay()]}）`;
 
-    goalInputEl.value = goals[currentKey] || "";
+    renderGoals();
 
     // stats (whole month)
     const total = currentTasks.length;
@@ -1811,7 +1890,15 @@
     render();
   });
 
-  goalInputEl.addEventListener("input", () => setGoal(currentKey, goalInputEl.value));
+  document.getElementById("goalForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const input = document.getElementById("goalItemInput");
+    const v = input.value.trim();
+    if (!v) return;
+    addGoalItem(currentKey, v);
+    input.value = "";
+    renderGoals();
+  });
 
   document.getElementById("addForm").addEventListener("submit", e => {
     e.preventDefault();
