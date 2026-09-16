@@ -27,6 +27,11 @@
     --danger-soft: #f1e2da;
     --ring-track: #ece4e0;
     --shadow: 0 1px 2px rgba(42,37,34,0.04), 0 10px 28px -18px rgba(42,37,34,0.22);
+    --cat-agency-color: #e0392a;
+    --cat-own-color: #2159e0;
+    --cat-other-color: #e8960f;
+    --overdue-bg: #fbe1de;
+    --overdue-border: #d43a2a;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -49,6 +54,11 @@
       --danger-soft: #33241f;
       --ring-track: #332f33;
       --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -18px rgba(0,0,0,0.55);
+      --cat-agency-color: #ff6b57;
+      --cat-own-color: #6a9bff;
+      --cat-other-color: #ffc24d;
+      --overdue-bg: #3d221d;
+      --overdue-border: #e0574a;
     }
   }
 
@@ -71,6 +81,11 @@
     --danger-soft: #33241f;
     --ring-track: #332f33;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -18px rgba(0,0,0,0.55);
+    --cat-agency-color: #ff6b57;
+    --cat-own-color: #6a9bff;
+    --cat-other-color: #ffc24d;
+    --overdue-bg: #3d221d;
+    --overdue-border: #e0574a;
   }
 
   * { box-sizing: border-box; }
@@ -83,12 +98,12 @@
   }
 
   .app {
-    max-width: 1440px;
+    max-width: 1920px;
     margin: 0 auto;
-    padding: 56px 24px 100px;
+    padding: 40px 32px 100px;
     display: grid;
     grid-template-columns: 300px 1fr;
-    gap: 40px;
+    gap: 32px;
     align-items: start;
   }
 
@@ -572,9 +587,9 @@
     position: relative;
     top: -1px;
   }
-  .cat-dot.cat-agency { background: var(--accent); }
-  .cat-dot.cat-own { background: var(--good); }
-  .cat-dot.cat-other { background: var(--cat-other); }
+  .cat-dot.cat-agency { background: var(--cat-agency-color); }
+  .cat-dot.cat-own { background: var(--cat-own-color); }
+  .cat-dot.cat-other { background: var(--cat-other-color); }
 
   .task-row .del {
     flex: none;
@@ -683,6 +698,8 @@
     flex: none;
   }
 
+  .month-grid-scroll { overflow-x: auto; }
+
   .month-weekdays {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -709,42 +726,122 @@
 
   .day-cell {
     position: relative;
-    appearance: none;
-    -webkit-appearance: none;
     background: var(--surface);
-    color: inherit;
-    min-height: 64px;
-    padding: 8px 6px;
+    min-height: 108px;
+    padding: 10px 12px 10px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    border: none;
-    font-family: inherit;
-    cursor: pointer;
+    gap: 7px;
   }
-  .day-cell:hover { background: var(--surface-2); }
-  .day-cell.empty { background: var(--surface-2); cursor: default; }
-  .day-cell.today .cell-daynum { color: var(--accent); font-weight: 600; }
-  .day-cell.selected { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .day-cell.empty { background: var(--surface-2); }
+  .day-cell.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .day-cell.has-overdue {
+    background: var(--overdue-bg);
+    box-shadow: inset 0 0 0 1.5px var(--overdue-border);
+  }
+  .day-cell.has-overdue.today {
+    box-shadow: inset 0 0 0 1.5px var(--overdue-border), inset 0 0 0 3.5px var(--accent);
+  }
 
+  .cell-head { display: flex; justify-content: flex-end; align-items: baseline; gap: 8px; }
+  .cell-weekday {
+    display: none;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
   .cell-daynum {
     font-family: "Shippori Mincho", serif;
     font-size: 15px;
   }
+  .day-cell.today .cell-daynum { color: var(--accent); font-weight: 600; }
 
-  .cell-dots {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 4px;
-    max-width: 56px;
+  .cell-tasks { display: flex; flex-direction: column; gap: 5px; }
+  .cell-tasks .task-row {
+    border-bottom: none;
+    padding: 0;
+    gap: 6px;
   }
-  .cell-dots .cat-dot { width: 6px; height: 6px; top: 0; }
-  .cell-dots .cat-dot.done {
-    background: transparent !important;
-    box-shadow: inset 0 0 0 1.5px currentColor;
-    color: var(--text-muted);
+  .cell-tasks .task-row.compact { align-items: flex-start; }
+  .cell-tasks .task-row.compact .chk { width: 15px; height: 15px; margin-top: 1px; }
+  .cell-tasks .task-row.compact .chk svg { width: 9px; height: 9px; }
+  .cell-tasks .task-row.compact .title {
+    font-size: 13px;
+    line-height: 1.35;
+    gap: 5px;
+    align-items: flex-start;
+    min-width: 0;
+  }
+  .cell-tasks .task-row.compact .title .cat-dot { margin-top: 5px; }
+  .cell-tasks .task-row.compact .title .label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .cell-tasks .task-row.compact .del { width: 17px; height: 17px; font-size: 12.5px; margin-top: 1px; }
+  .cell-tasks .task-row.compact .del svg { width: 9.5px; height: 9.5px; }
+
+  .day-cell .task-edit.grid-edit {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 270px;
+    z-index: 15;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    box-shadow: var(--shadow);
+    padding: 12px;
+  }
+  .day-cell .task-edit.grid-edit .edit-row { flex-wrap: wrap; row-gap: 8px; }
+
+  /* below this width a 7-column grid leaves too little room per day for the
+     task text to be legible, so fall back to a full-width agenda list —
+     every day still shows, just stacked instead of gridded */
+  @media (max-width: 640px) {
+    .month-weekdays { display: none; }
+
+    .weeks { grid-template-columns: 1fr; gap: 0; border-left: none; border-right: none; }
+    .day-cell.empty { display: none; }
+
+    .day-cell {
+      min-height: 0;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .day-cell:last-child { border-bottom: none; }
+
+    .cell-head {
+      flex-direction: column-reverse;
+      align-items: center;
+      gap: 2px;
+      flex: none;
+      width: 34px;
+      padding-top: 2px;
+    }
+    .cell-weekday { display: block; }
+
+    .cell-tasks { flex: 1; gap: 8px; min-width: 0; }
+    .cell-tasks .task-row.compact .chk { width: 19px; height: 19px; }
+    .cell-tasks .task-row.compact .chk svg { width: 11px; height: 11px; }
+    .cell-tasks .task-row.compact .title { font-size: 14.5px; }
+    .cell-tasks .task-row.compact .title .label {
+      overflow: visible;
+      white-space: normal;
+      text-overflow: clip;
+    }
+    .cell-tasks .task-row.compact .del { width: 22px; height: 22px; font-size: 15px; }
+    .cell-tasks .task-row.compact .del svg { width: 12px; height: 12px; }
+
+    .day-cell .task-edit.grid-edit {
+      position: static;
+      width: auto;
+      box-shadow: none;
+      border-color: var(--border);
+      flex: 1;
+    }
   }
 
   footer.hint {
@@ -880,18 +977,12 @@
 
     <section>
       <div id="seedBannerWrap"></div>
-      <div class="month-weekdays">
-        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      <div class="month-grid-scroll">
+        <div class="month-weekdays">
+          <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+        </div>
+        <div class="weeks" id="weeks"></div>
       </div>
-      <div class="weeks" id="weeks"></div>
-    </section>
-
-    <section class="today-card" id="selectedDaySection">
-      <div class="today-head">
-        <div class="today-title" id="selectedDayTitle"></div>
-        <div class="today-date" id="selectedDayCount"></div>
-      </div>
-      <div class="task-list" id="selectedDayList"></div>
       <footer class="hint">タスクはこのリンクを開いた端末どうしで共有されます。</footer>
     </section>
   </main>
@@ -1371,9 +1462,6 @@
   const overdueSectionEl = document.getElementById("overdueSection");
   const overdueListEl = document.getElementById("overdueList");
   const weeksEl = document.getElementById("weeks");
-  const selectedDayTitleEl = document.getElementById("selectedDayTitle");
-  const selectedDayCountEl = document.getElementById("selectedDayCount");
-  const selectedDayListEl = document.getElementById("selectedDayList");
   const pctTextEl = document.getElementById("pctText");
   const doneOfTotalEl = document.getElementById("doneOfTotal");
   const statRemainingEl = document.getElementById("statRemaining");
@@ -1414,10 +1502,10 @@
 
   function renderTaskRow(task, opts) {
     opts = opts || {};
-    if (task.id === editingId) return renderEditRow(task);
+    if (task.id === editingId) return renderEditRow(task, opts);
 
     const row = document.createElement("div");
-    row.className = "task-row" + (task.done ? " done" : "");
+    row.className = "task-row" + (task.done ? " done" : "") + (opts.compact ? " compact" : "");
 
     const chk = document.createElement("button");
     chk.className = "chk" + (task.done ? " done" : "");
@@ -1442,6 +1530,7 @@
     const label = document.createElement("span");
     label.className = "label";
     label.textContent = task.title;
+    if (opts.compact) label.title = task.title;
     title.appendChild(label);
 
     row.appendChild(chk);
@@ -1464,9 +1553,10 @@
     return row;
   }
 
-  function renderEditRow(task) {
+  function renderEditRow(task, opts) {
+    opts = opts || {};
     const row = document.createElement("div");
-    row.className = "task-row task-edit";
+    row.className = "task-row task-edit" + (opts.compact ? " grid-edit" : "");
 
     const titleInput = document.createElement("input");
     titleInput.type = "text";
@@ -1544,7 +1634,6 @@
 
   let currentKey = "";
   let currentTasks = [];
-  let selectedDate = toISO(today);
 
   function currentMonthLastDay() {
     return new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
@@ -1592,7 +1681,6 @@
     }
 
     renderWeeks();
-    renderSelectedDay();
   }
 
   function renderTodayList() {
@@ -1644,27 +1732,20 @@
       const isToday = iso === todayISO;
       const dayTasks = currentTasks.filter(t => t.date === iso)
         .sort((a, b) => Number(a.done) - Number(b.done));
+      const hasOverdue = iso < todayISO && dayTasks.some(t => !t.done);
 
-      const cell = document.createElement("button");
-      cell.type = "button";
-      cell.className = "day-cell" + (isToday ? " today" : "") + (iso === selectedDate ? " selected" : "");
-      cell.setAttribute("aria-label", `${d}日、${dayTasks.length}件`);
+      const cell = document.createElement("div");
+      cell.className = "day-cell" + (isToday ? " today" : "") + (hasOverdue ? " has-overdue" : "");
 
-      const daynum = document.createElement("span");
-      daynum.className = "cell-daynum";
-      daynum.textContent = String(d);
-      cell.appendChild(daynum);
+      const head = document.createElement("div");
+      head.className = "cell-head";
+      head.innerHTML = `<span class="cell-weekday">${WEEKDAYS[new Date(year, month, d).getDay()]}</span><span class="cell-daynum">${d}</span>`;
+      cell.appendChild(head);
 
-      const dots = document.createElement("div");
-      dots.className = "cell-dots";
-      dayTasks.forEach(t => {
-        const dot = document.createElement("i");
-        dot.className = "cat-dot cat-" + (t.category || "other") + (t.done ? " done" : "");
-        dots.appendChild(dot);
-      });
-      cell.appendChild(dots);
-
-      cell.addEventListener("click", () => { selectedDate = iso; render(); });
+      const list = document.createElement("div");
+      list.className = "cell-tasks";
+      dayTasks.forEach(t => list.appendChild(renderTaskRow(t, { compact: true })));
+      cell.appendChild(list);
 
       weeksEl.appendChild(cell);
     }
@@ -1677,26 +1758,6 @@
       filler.className = "day-cell empty";
       weeksEl.appendChild(filler);
     }
-  }
-
-  function renderSelectedDay() {
-    const [y, m, d] = selectedDate.split("-").map(Number);
-    const wd = WEEKDAYS[new Date(selectedDate + "T00:00:00").getDay()];
-    selectedDayTitleEl.textContent = `${m}月${d}日（${wd}）`;
-
-    const dayTasks = allTasks.filter(t => t.date === selectedDate)
-      .sort((a, b) => Number(a.done) - Number(b.done));
-    selectedDayCountEl.textContent = dayTasks.length ? `${dayTasks.length}件` : "";
-
-    selectedDayListEl.innerHTML = "";
-    if (!dayTasks.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty-note";
-      empty.textContent = "この日の予定はありません。";
-      selectedDayListEl.appendChild(empty);
-      return;
-    }
-    dayTasks.forEach(t => selectedDayListEl.appendChild(renderTaskRow(t)));
   }
 
   function toggleTask(id) {
